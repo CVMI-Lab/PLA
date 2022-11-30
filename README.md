@@ -1,5 +1,5 @@
 # PLA
-**language-driven open-vocabulary 3D scene understanding**
+**Language-driven Open-Vocabulary 3D Scene Understanding**
 
 ![framwork](./docs/framework.png)
 
