@@ -1,4 +1,4 @@
-# PLA
+# PLA (Point-Language Association)
 **Language-driven Open-Vocabulary 3D Scene Understanding**
 
 ![framwork](./docs/framework.png)
