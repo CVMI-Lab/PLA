@@ -1,0 +1,63 @@
+_BASE_CONFIG_: cfgs/s3dis_models/inst/softgroup_clip_adamw.yaml
+
+DATA_CONFIG:
+  inst_class_idx: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 ]
+  base_class_idx: [ 0, 1, 2, 3, 4, 6, 8, 11 ]
+  novel_class_idx: [ 5, 7, 9, 10 ]
+  ignore_class_idx: [ 12 ]
+
+  CAPTION_INFO:
+
+    KEY: [SCENE, VIEW, ENTITY]
+    SCENE:
+      ENABLED: False
+      CAPTION_PATH: text_embed/caption_scene_s3dis_vit-gpt2-image-captioning_max50.json
+      GATHER_CAPTION: True
+
+    VIEW:
+      ENABLED: True
+      CAPTION_PATH: text_embed/caption_view_s3dis_vit-gpt2-image-captioning_max50.json
+      IMAGE_CORR_PATH: caption_idx/s3dis_view_vit-gpt2_matching_idx
+      SELECT: ratio
+      NUM: 1
+      RATIO: 0.2
+      GATHER_CAPTION: True
+
+    ENTITY:
+      ENABLED: True
+      CAPTION_PATH: text_embed/caption_entity_s3dis_vit-gpt2-image-captioning_max50.json
+      IMAGE_CORR_PATH: caption_idx/s3dis_entity_vit-gpt2_matching_idx
+      SELECT: ratio
+      NUM: 1
+      RATIO: 1.0
+      GATHER_CAPTION: True
+  
+    CAPTION_CORR_PATH_IN_ONE_FILE: False
+
+
+MODEL:
+
+  BINARY_HEAD:
+    NAME: BinaryHead
+    DETACH: True
+    THRESH: 0.5
+    CUSTOM_SP1X1: True
+    HOOK_FEATURE_LIST: ['unet.blocks.block1', 'unet.u.blocks.block1',
+                        'unet.u.u.blocks.block1', 'unet.u.u.u.blocks.block1',
+                        'unet.u.u.u.u.blocks.block1', 'unet.u.u.u.u.u.blocks.block1',
+                        'unet.u.u.u.u.u.u.blocks.block1' ]
+
+  TASK_HEAD:
+    NAME: TextSegHead
+    CORRECT_SEG_PRED_BINARY: True
+  
+  CAPTION_HEAD:
+    NAME: CaptionHead
+    FEAT_NORM: True
+    LOGIT_SCALE:
+      value: 100.0
+      learnable: True
+    LOSS_WEIGHT:
+      SCENE: 0.0
+      VIEW: 0.08
+      ENTITY: 0.02

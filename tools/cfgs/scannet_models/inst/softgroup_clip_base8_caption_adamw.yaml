@@ -1,0 +1,8 @@
+_BASE_CONFIG_: cfgs/scannet_models/inst/softgroup_clip_base13_caption_adamw.yaml
+
+DATA_CONFIG:
+  # TODO: make base + novel = all.
+  inst_class_idx: [ 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 ]
+  base_class_idx: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 13 ]
+  novel_class_idx: [ 9, 10, 11, 12, 14, 15, 16, 17, 18 ]
+  ignore_class_idx: [ 19 ]

@@ -1,0 +1,113 @@
+CLASS_NAMES: [wall, floor, cabinet, bed, chair, sofa, table, door, window, bookshelf, picture, counter, desk,
+              curtain, refrigerator, showercurtain, toilet, sink, bathtub, otherfurniture]
+
+DATA_CONFIG:
+  _BASE_CONFIG_: cfgs/dataset_configs/scannet_dataset.yaml
+  DATASET: ScanNetInstDataset
+  inst_class_idx: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+  sem2ins_classes: []
+  inst_label_shift: 2
+
+  ignore_class_idx: [19]
+
+MODEL:
+  NAME: SparseUNetTextSeg
+  REMAP_FROM_3DLANG: False
+
+  VFE:
+    NAME: IndoorVFE
+    USE_XYZ: True
+
+  BACKBONE_3D:
+    NAME: SparseUNetIndoor
+    IN_CHANNEL: 6
+    MID_CHANNEL: 16
+    BLOCK_RESIDUAL: True
+    BLOCK_REPS: 2
+    NUM_BLOCKS: 7
+    CUSTOM_SP1X1: True
+
+  ADAPTER:
+    NAME: VLAdapter
+    EVAL_ONLY: False
+    NUM_ADAPTER_LAYERS: 2
+    TEXT_DIM: -1
+    LAST_NORM: True
+
+  TASK_HEAD:
+    NAME: TextSegHead
+    FEAT_NORM: False
+
+    LAST_NORM: True
+    TEXT_EMBED:
+      NAME: CLIP
+      NORM: True
+      PATH: text_embed/scannet_clip-ViT-B16_id.pth
+    FEAT_NORM: False
+    LOGIT_SCALE:
+      value: 1.0
+      learnable: False
+  
+  INST_HEAD:
+    NAME: InstHead
+
+    BLOCK_RESIDUAL: True
+    CUSTOM_SP1X1: True
+
+    CLUSTERING:
+      PREPARE_EPOCH: 32
+      GROUPING_CFG:
+        SCORE_THR: 0.2
+        RADIUS: 0.04
+        MEAN_ACTIVE: 300
+        CLASS_NUMPOINT_MEAN: [-1., -1., -1., -1., -1., -1., -1., -1., -1., -1.,
+                              -1., -1., -1., -1., -1., -1., -1., -1., -1., -1.]
+        NPOINT_THR: 50  # absolute if class_numpoint == -1, relative if class_numpoint != -1
+        IGNORE_CLASSES: [0, 1]
+      INST_VOXEL_CFG:
+        SCALE: 50
+        SPATIAL_SHAPE: 20
+      LOSS_CFG:
+        MAX_PROPOSAL_NUM: 200
+        POS_IOU_THR: 0.5
+      TEST_CFG:
+        # x4_split: False
+        CLS_SCORE_THR: 0.001
+        MASK_SCORE_THR: -0.5
+        MIN_NPOINT: 100
+
+    FIXED_MODULES: []
+    SEMANTIC_ONLY: False
+
+
+TEXT_ENCODER:
+  NAME: CLIP
+  BACKBONE: ViT-B/16  # ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14']
+  TEMPLATE: identity
+  EXTRACT_EMBED: False  # Online extract text embeding from class or not
+#  BERT:
+#  BACKBONE: bert-base-uncased
+
+OPTIMIZATION:
+  TEST_BATCH_SIZE_PER_GPU: 1
+  BATCH_SIZE_PER_GPU: 4
+  NUM_EPOCHS: 150
+  LR: 0.004  # 4e-3
+  SCHEDULER: cos_after_step
+  OPTIMIZER: adamw
+  WEIGHT_DECAY: 0.0001
+  MOMENTUM: 0.9
+  STEP_EPOCH: 82
+  MULTIPLIER: 0.1
+  CLIP_GRAD: False
+  PCT_START: 0.52
+  DIV_FACTOR: 2
+  MOMS: [0.95, 0.85]
+  LR_CLIP: 0.000001
+
+OTHERS:
+  PRINT_FREQ: 20
+  SYNC_BN: False
+  USE_AMP: True
+  EVAL_FREQ: 10
+  FIND_UNUSED_PARAMETERS: True

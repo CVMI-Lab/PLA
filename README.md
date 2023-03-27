@@ -1,15 +1,53 @@
-# PLA (Point-Language Association)
-**Language-Driven Open-Vocabulary 3D Scene Understanding**
+<div align="center">
 
-![framwork](./docs/framework.png)
+<h1>PLA: Language-Driven Open-Vocabulary 3D Scene Understanding</h1>
+
+<div>
+    <a href="https://dingry.github.io/" target="_blank">Runyu Ding</a><sup>1*</sup>,</span>
+    <a href="https://jihanyang.github.io/" target="_blank">Jihan Yang</a><sup>1*</sup>,</span>
+    <a href="https://scholar.google.com/citations?user=KJU5YRYAAAAJ&hl=en" target="_blank">Chuhui Xue</a><sup>2</sup>,</span>
+    <a href="https://github.com/HannibalAPE" target="_blank">Wenqing Zhang</a><sup>2</sup>,</span>
+    <a href="https://songbai.site/" target="_blank">Song Bai</a><sup>2&#8224</sup>,</span>
+    <a href="https://xjqi.github.io/" target="_blank">Xiaojuan Qi</a><sup>1&#8224</sup>,</span>  
+</div>
+
+<div>
+    <sup>1</sup>The University of Hong Kong&emsp;
+    <sup>2</sup>ByteDance
+</div>
+
+<div>
+    *equal contribution&emsp;
+    <sup>+</sup>corresponding author
+</div>
+
+**CVPR 2023**
+
+TL;DL: PLA leverages powerful VL foundation models to construct hierarchical 3D-text pairs for 3D open-world learning.
+
+<table>
+<tr>
+    <td><img src="assets/scene_0025.gif" width="100%"/></td>
+    <td><img src="assets/scene_005.gif" width="100%"/></td>
+    <td><img src="assets/scene_0019.gif" width="100%"/></td>
+</tr>
+<tr>
+    <td align='center' width='24%'>working space</td>
+    <td align='center' width='24%'>piano</td>
+    <td align='center' width='24%'>vending machine</td>
+<tr>
+</table>
+
+</div>
+
+<!-- ![framwork](./docs/framework.png)
 ![association](./docs/association_module.png)
 
-**Authors**: Runyu Ding\*, Jihan Yang\*, Chuhui Xue, Wenqing Zhang, Song Bai, Xiaojuan Qi  (\*equal contribution)
 
-[project page](https://dingry.github.io/projects/PLA) | [arXiv](https://arxiv.org/abs/2211.16312)
+[project page](https://dingry.github.io/projects/PLA) | [arXiv](https://arxiv.org/abs/2211.16312) -->
 
 ### TODO
-- [ ] Release code and pretrained model (soon)
+- [ ] Release caption processing code
 
 ### Getting Started
 
@@ -19,60 +57,9 @@ Please refer to [INSTALL.md](docs/INSTALL.md) for the installation.
 #### Dataset Preparation
 Please refer to [DATASET.md](docs/INSTALL.md) for dataset preparation.
 
-#### Training
+#### Training & Inference
 
-```bash
-cd tools
-sh scripts/dist_train.sh ${NUM_GPUS} --cfg_file ${CONFIG_FILE} ${PY_ARGS}
-```
-
-For instance,
-- train B15/N4 semantic segmentation on ScanNet:
-    ```bash
-    cd tools
-    sh scripts/dist_train.sh 8 --cfg_file cfgs/scannet_models/spconv_clip_base15_caption_adamw.yaml --extra_tag exp_tag
-    ```
-- train B13/N4 instance segmentation on ScanNet:
-    ```bash
-    cd tools
-    sh scripts/dist_train.sh 8 --cfg_file cfgs/scannet_models/inst/softgroup_clip_base13_caption_adamw.yaml --extra_tag exp_tag
-    ```
-
-#### Inference
-
-```bash
-cd tools
-sh scripts/dist_test.sh ${NUM_GPUS} --cfg_file ${CONFIG_FILE} --ckpt ${CKPT_PATH}
-```
-
-For instance,
-- to test a B15/N4 model on ScanNet:
-    ```bash
-    cd tools
-    sh scripts/dist_test.sh 8 --cfg_file cfgs/scannet_models/spconv_clip_base15_caption_adamw.yaml --ckpt output/scannet_models/spconv_clip_base15_caption/exp_tag/ckpt/checkpoint_ep128.pth
-    ```
-
-### Model Zoo
-- semantic segmentation
-
-    | Dataset | Partition | hIoU / mIoU(B) / mIoU(N) | Path |
-    |:---:|:---:|:---:|:---:|
-    | ScanNet | B15/N4 |||
-    | ScanNet | B12/N7 |||
-    | ScanNet | B10/N9 |||
-    | S3DIS | B8/N4 |||
-    | S3DIS | B6/N6 |||
-
-
-- instance segmentation
-
-    | Dataset | Partition | hAP$_{50}$ / hAP$_{50}$(B) / hAP$_{50}$ (N) | Path |
-    |:---:|:---:|:---:|:---:|
-    | ScanNet | B13/N4 |||
-    | ScanNet | B10/N7 |||
-    | ScanNet | B8/N9 |||
-    | S3DIS | B8/N4 |||
-    | S3DIS | B6/N6 |||
+Please refer to [MODEL.md](docs/MODEL.md) for training and inference scripts and pretrained models.
 
 
 ### Citation

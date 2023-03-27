@@ -1,0 +1,74 @@
+CLASS_NAMES: [ceiling, floor, wall, beam, column, window, door, table, chair, sofa, bookcase, board, clutter]
+
+DATA_CONFIG:
+  _BASE_CONFIG_: cfgs/dataset_configs/s3dis_dataset.yaml
+  ignore_class_idx: [12]
+
+MODEL:
+  NAME: SparseUNetTextSeg
+  REMAP_FROM_3DLANG: False
+  REMAP_FROM_NOADAPTER: False
+
+  VFE:
+    NAME: IndoorVFE
+    USE_XYZ: True
+
+  BACKBONE_3D:
+    NAME: SparseUNetIndoor
+    IN_CHANNEL: 6
+    MID_CHANNEL: 16
+    BLOCK_RESIDUAL: True
+    BLOCK_REPS: 2
+    NUM_BLOCKS: 7
+    CUSTOM_SP1X1: True
+
+  ADAPTER:
+    NAME: VLAdapter
+    EVAL_ONLY: False
+    NUM_ADAPTER_LAYERS: 2
+    TEXT_DIM: -1
+    LAST_NORM: True
+    FEAT_NORM: False
+
+  TASK_HEAD:
+    NAME: TextSegHead
+
+    TEXT_EMBED:
+      NAME: CLIP
+      NORM: True
+      PATH: text_embed/s3dis_clip-ViT-B16_id.pth
+
+    LOGIT_SCALE:
+      value: 1.0
+      learnable: False
+
+TEXT_ENCODER:
+  NAME: CLIP
+  BACKBONE: ViT-B/16  # ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14']
+  TEMPLATE: identity
+  EXTRACT_EMBED: False  # Online extract text embeding from class or not
+#  BERT:
+#  BACKBONE: bert-base-uncased
+
+OPTIMIZATION:
+  TEST_BATCH_SIZE_PER_GPU: 1
+  BATCH_SIZE_PER_GPU: 4
+  NUM_EPOCHS: 32
+  LR: 0.004  # 4e-3
+  SCHEDULER: cos_after_step
+  OPTIMIZER: adamw
+  WEIGHT_DECAY: 0.0001
+  MOMENTUM: 0.9
+  STEP_EPOCH: 20
+  MULTIPLIER: 0.1
+  CLIP_GRAD: False
+  PCT_START: 0.39
+  DIV_FACTOR: 1
+  MOMS: [0.95, 0.85]
+  LR_CLIP: 0.000001
+
+OTHERS:
+  PRINT_FREQ: 20
+  EVAL_FREQ: 5
+  SYNC_BN: False
+  USE_AMP: True

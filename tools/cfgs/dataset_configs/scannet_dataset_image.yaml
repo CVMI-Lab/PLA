@@ -1,0 +1,67 @@
+DATA_PATH: ../data/scannetv2
+DATASET: ScanNetDataset
+
+COLLATE_FN: collate_batch_indoor
+MIN_SPATIAL_SCALE: 128
+
+DATA_SPLIT:
+  train: train
+  test: val
+  data_suffix: .pth
+
+IGNORE_LABEL: -100
+
+DATA_AUG:
+  AUG_LIST: [ scene_aug, elastic, crop, shuffle ]
+  scene_aug:
+    scaling_scene:
+      enabled: False
+      p: 1.0
+      value: [0.9, 1.1]
+
+    rotation:
+      p: 1.0
+      value: [0.0, 0.0, 1.0]
+
+    jitter: True
+    color_jitter: True
+
+    flip:
+      p: 0.5
+
+    random_jitter:
+      enabled: False
+      value: 0.01
+      accord_to_size: False
+      p: 1.0
+
+  elastic:
+    enabled: True
+    value: [[6, 40], [20, 160]]
+    apply_to_feat: False
+    p: 1.0
+
+  crop:
+    step: 32
+
+  shuffle: True
+
+DATA_PROCESSOR:
+  repeat: 4
+  rgb_norm: True
+  point_range: 200000000
+  voxel_scale: 50  # voxel_size = 1 / scale, scale 25(0.02m)
+  cache: True
+  max_npoint: 250000
+  full_scale: [128, 512]
+  voxel_mode: 4
+  xyz_norm: False
+  xyz_as_feat: True
+  rgb_as_feat: True
+
+  PROCESS_LIST: []
+
+
+IMAGE_PATH: scannet_frames_25k
+DEPTH_IMAGE_SCALE: [480, 640]
+LOAD_IMAGE: True

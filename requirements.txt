@@ -1,0 +1,19 @@
+open3d
+numpy
+torch==1.8.1+cu111
+torchvision==0.9.1+cu111
+tensorboardX
+easydict
+pyyaml
+tqdm
+SharedArray
+scipy
+opencv-python
+plyfile
+matplotlib
+scikit-learn
+scikit-image
+pandas
+transformers
+clip @ git+https://github.com/openai/CLIP.git
+spconv-cu111
