@@ -15,8 +15,8 @@ The dataset configs are located within [cfgs/dataset_configs](../cfgs/dataset_co
     │   │   │── caption_idx
     │   │   │── scannetv2_train.txt
     │   │   │── scannetv2_val.txt
-    ├── cfgs
-    ├── dataset
+    ├── pcseg
+    ├── tools
     ```
 
 #### S3DIS Dataset
@@ -36,8 +36,8 @@ The dataset configs are located within [cfgs/dataset_configs](../cfgs/dataset_co
     │   │   │   │── ...
     │   │   │── text_embed
     │   │   │── caption_idx
-    ├── cfgs
-    ├── dataset
+    ├── pcseg
+    ├── tools
     ```
 
 The scripts that process ScanNet and S3DIS images to generate captions and corresponding point indices will be available soon.

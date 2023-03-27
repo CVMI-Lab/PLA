@@ -55,7 +55,7 @@ TL;DL: PLA leverages powerful VL foundation models to construct hierarchical 3D-
 Please refer to [INSTALL.md](docs/INSTALL.md) for the installation.
 
 #### Dataset Preparation
-Please refer to [DATASET.md](docs/INSTALL.md) for dataset preparation.
+Please refer to [DATASET.md](docs/DATASET.md) for dataset preparation.
 
 #### Training & Inference
 

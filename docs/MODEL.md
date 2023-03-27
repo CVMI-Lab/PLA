@@ -45,7 +45,7 @@ For instance,
 
 - instance segmentation
 
-    | Dataset | Partition | hAP<sub>50</sub> / hAP<sub>50</sub>(B) / hAP<sub>50</sub>(N) | Path |
+    | Dataset | Partition | hAP<sub>50</sub> / mAP<sub>50</sub>(B) / mAP<sub>50</sub>(N) | Path |
     |:---:|:---:|:---:|:---:|
     | ScanNet | B13/N4 | 57.8 / 58.7 / 56.9| [ckpt](https://connecthkuhk-my.sharepoint.com/:u:/g/personal/u3007346_connect_hku_hk/Eb4N2hfCevlBlBxWlK9DtioBP6RX7gtXUmY0Huu4MknUHA?e=YDydlj) |
     | ScanNet | B10/N7 | 31.6 / 54.8 / 22.2 | [ckpt](https://connecthkuhk-my.sharepoint.com/:u:/g/personal/u3007346_connect_hku_hk/ETsHZCFElvdCmk8ulRzBk-EBxm8fHk8rLJnpUdk9_n3i1Q?e=4SGy1N) |
