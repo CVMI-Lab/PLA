@@ -23,7 +23,7 @@
 
 **CVPR 2023**
 
-TL;DL: PLA leverages powerful VL foundation models to construct hierarchical 3D-text pairs for 3D open-world learning.
+TL;DR: PLA leverages powerful VL foundation models to construct hierarchical 3D-text pairs for 3D open-world learning.
 
 <table>
 <tr>
