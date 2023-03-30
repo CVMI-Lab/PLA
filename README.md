@@ -38,14 +38,14 @@ TL;DR: PLA leverages powerful VL foundation models to construct hierarchical 3D-
 <tr>
 </table>
 
-</div>
 
 <!-- ![framwork](./docs/framework.png)
-![association](./docs/association_module.png)
+![association](./docs/association_module.png)-->
 
 
-[project page](https://dingry.github.io/projects/PLA) | [arXiv](https://arxiv.org/abs/2211.16312) -->
+[project page](https://dingry.github.io/projects/PLA) | [arXiv](https://arxiv.org/abs/2211.16312)
 
+</div>
 ### TODO
 - [ ] Release caption processing code
 
