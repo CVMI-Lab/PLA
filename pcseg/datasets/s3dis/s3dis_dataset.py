@@ -127,7 +127,7 @@ class S3DISDataset(IndoorDataset):
             # perform augmentations
             data_dict = self.augmentor.forward(data_dict)
             if not data_dict['valid']:
-                return self.__getitem__(np.random.randint(self.__len__()))
+                return S3DISDataset.__getitem__(self, np.random.randint(self.__len__()))
         else:
             xyz_voxel_scale = xyz * self.voxel_scale
             xyz_voxel_scale -= xyz_voxel_scale.min(0)
@@ -206,8 +206,8 @@ class S3DISDataset(IndoorDataset):
             return
 
         for item in self.data_list:
-            if os.path.exists("/dev/shm/{}_nn".format(item)):
-                sa_delete("shm://{}_nn".format(item))
+            if os.path.exists("/dev/shm/{}".format(item)):
+                sa_delete("shm://{}".format(item))
 
 
 class S3DISInstDataset(S3DISDataset):
@@ -230,7 +230,7 @@ class S3DISInstDataset(S3DISDataset):
             inst_label[binary_label == 0] = self.ignore_label
         inst_label = self.get_valid_inst_label(inst_label, label != self.ignore_label)
         if self.training and inst_label.max() < 0:
-            return self.__getitem__(np.random.randint(self.__len__()))
+            return S3DISInstDataset.__getitem__(self, np.random.randint(self.__len__()))
         info = self.get_inst_info(points, inst_label.astype(np.int32), label)
         data_dict['inst_label'] = inst_label
         data_dict.update(info)

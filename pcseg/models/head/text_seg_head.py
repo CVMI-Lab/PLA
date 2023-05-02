@@ -59,6 +59,7 @@ class TextSegHead(nn.Module):
         self.cls_head.load_state_dict(OrderedDict({'weight': text_embed.float()}))
 
     def forward(self, batch_dict):
+        self.forward_ret_dict = {}
         # if self.eval_only and self.training:
         #     return batch_dict
 

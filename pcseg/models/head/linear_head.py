@@ -24,6 +24,7 @@ class LinearHead(nn.Module):
         self.forward_ret_dict = {}
 
     def forward(self, batch_dict):
+        self.forward_ret_dict = {}
         backbone3d_feats = batch_dict['backbone_3d_feats']
 
         semantic_scores = self.cls_head(backbone3d_feats)

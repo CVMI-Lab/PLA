@@ -51,6 +51,7 @@ class BinaryHead(nn.Module):
             m.bias.data.fill_(0.0)
 
     def forward(self, batch_dict):
+        self.forward_ret_dict = {}
         binary_scores = self.binary_encoder(self.binary_feat_input)
         binary_scores = self.binary_classifier(binary_scores).features
 

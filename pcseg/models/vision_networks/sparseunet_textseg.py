@@ -15,14 +15,14 @@ class SparseUNetTextSeg(ModelTemplate):
             batch_dict = cur_module(batch_dict)
 
         ret_dict = self.task_head.forward_ret_dict
-        if hasattr(self, 'inst_head') and self.inst_head is not None:
-            ret_dict.update(self.inst_head.forward_ret_dict)
         if self.training:
             loss, tb_dict, disp_dict = self.get_training_loss()
 
             ret_dict['loss'] = loss
             return ret_dict, tb_dict, disp_dict
         else:
+            if hasattr(self, 'inst_head') and self.inst_head is not None:
+                ret_dict.update(self.inst_head.forward_ret_dict)
             return ret_dict
 
     def get_training_loss(self):

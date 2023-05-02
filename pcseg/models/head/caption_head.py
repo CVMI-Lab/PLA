@@ -35,6 +35,7 @@ class CaptionHead(nn.Module):
         return caption_loss_func
 
     def forward(self, batch_dict):
+        self.forward_ret_dict = {}
         if not self.training:
             return batch_dict
 

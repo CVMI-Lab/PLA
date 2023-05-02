@@ -354,6 +354,7 @@ class InstHead(nn.Module):
         return gt_ins
 
     def forward(self, batch_dict):
+        self.forward_ret_dict = {}
         self.semantic_only = batch_dict['epoch'] < self.prepare_epoch
 
         if not self.training and batch_dict['test_x4_split']:
