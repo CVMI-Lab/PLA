@@ -77,6 +77,11 @@ class CaptionHead(nn.Module):
         batch_idx = batch_dict['batch_idxs']
 
         pooled_feats = scatter_mean(adapter_feats, index=batch_idx.long(), dim=0)
+        exist_caption_idx = torch.ones(pooled_feats.shape[0]).bool().cuda()
+        for ii in range(exist_caption_idx.shape[0]):
+            if len(caption_info['select_image_corr'][ii]) == 0:
+                exist_caption_idx[ii] = False
+        pooled_objs = pooled_objs[exist_caption_idx]
 
         caption_logit, caption_labels = self.prepare_caption_loss_logit_and_labels(
             pooled_feats, caption_embed, logit_scale, caption_idx

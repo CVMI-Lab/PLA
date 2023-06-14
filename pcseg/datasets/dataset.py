@@ -226,8 +226,11 @@ class DatasetTemplate(torch_data.Dataset):
     @staticmethod
     def select_caption_and_idx(caption, caption_cfg, scene_name, image_names, image_corr_indices):
         if image_corr_indices is None:
-            select_captions = [caption[scene_name]]
-            select_image_corr = [None]
+            if scene_name in caption:
+                select_captions = [caption[scene_name]]
+                select_image_corr = [None]
+            else:
+                select_captions, select_image_corr = [], []
         else:
             assert len(image_names) == 0 or len(caption[scene_name]) == len(image_names)
             select_image_names, select_image_corr = DatasetTemplate.select_images(
