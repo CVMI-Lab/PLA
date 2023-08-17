@@ -152,7 +152,7 @@ class ScanNetProcessor(ProcessorTemplate):
         # self.scene_path = sorted(glob.glob(os.path.join(args.dataset_path, args.image_tag, 'scene*')))
         with open(os.path.join(args.dataset_path, 'scannetv2_{}.txt'.format(args.dataset_split))) as fin:
             self.scene_list = fin.readlines()
-        self.scene_list = sorted([s.strip() for s in self.scene_list])[:10]
+        self.scene_list = sorted([s.strip() for s in self.scene_list])
 
     def process_view_caption(self):
         captions_view = {}
@@ -255,6 +255,119 @@ class ScanNetProcessor(ProcessorTemplate):
         return entity_caption
 
 
+class S3DISProcessor(ProcessorTemplate):
+    def __init__(self, device):
+        super(S3DISProcessor, self).__init__(device)
+        # self.scene_path = sorted(glob.glob(os.path.join(args.dataset_path, args.image_tag, 'scene*')))
+        data_list = sorted(os.listdir(os.path.join(args.dataset_path, 'stanford_indoor3d_inst/')))
+        data_list = [item[:-4] for item in data_list if 'Area_' in item]
+        self.scene_list = [item for item in data_list if not 'Area_5' in item]
+
+    def process_view_caption(self):
+        captions_view = {}
+
+        print('Processing view captions.....')
+        for scene in tqdm(self.scene_list):
+            scene_name = scene.split('/')[-1]
+            _, area_num, room_name, room_num = scene_name.split('_')
+            img_path = sorted(glob.glob(
+                os.path.join(args.dataset_path, args.image_tag,
+                             'area_{}/data/rgb/*_{}_{}_*.png'.format(area_num, room_name, room_num))))
+
+            res = self.model.predict_step(img_path)
+            captions_view[scene_name] = res
+
+        write_caption_to_file(
+            captions_view,
+            os.path.join(args.output_dir, 'caption_view_{}_{}_{}.json'.format(
+                args.dataset, args.caption_model.split('/')[-1], args.tag))
+        )
+
+    def process_scene_caption(self):
+        print('Processing scene captions.....')
+
+        # load view caption
+        caption_view_path = args.view_caption_path
+        # os.path.join(args.output_dir, 'caption_view_{}_{}_{}.json'.format(
+        #     args.dataset, args.caption_model.split('/')[-1], args.tag))
+        captions_view = json.load(open(caption_view_path, 'r'))
+        print(f'load view captions from {caption_view_path}')
+        captions_scene = {}
+
+        for i, scene in tqdm(enumerate(self.scene_list)):
+            # scene = scene.split('/')[-1]
+            text = '. '.join(captions_view[scene].values())
+            if len(text.split(' ')) > 75:
+                sum_caption = self.summarizer(text, max_length=75)[0]['summary_text']
+            else:
+                sum_caption = text
+            captions_scene[scene] = sum_caption
+
+        write_caption_to_file(
+            captions_scene,
+            os.path.join(args.output_dir, 'caption_scene_{}_{}_{}.json'.format(
+                args.dataset, args.caption_model.split('/')[-1], args.tag))
+        )
+
+    def process_entity_caption(self):
+
+        print('Processing entity captions.....')
+
+        view_caption = json.load(open(args.view_caption_path, 'r'))
+        view_caption_corr_idx = pickle.load(open(args.view_caption_corr_idx_path, 'rb'))
+        # res = self.model.predict_step(img_path)
+        view_entity_caption = self.extract_entity(view_caption)
+        captions_entity = self.get_entity_caption(view_entity_caption, view_caption_corr_idx)
+        write_caption_to_file(
+            captions_entity,
+            os.path.join(args.output_dir, 'caption_entity_{}_{}_{}.json'.format(
+                args.dataset, args.caption_model.split('/')[-1], args.tag))
+        )
+
+    def get_entity_caption(self, view_entity_caption, view_caption_corr_idx):
+        entity_caption = {}
+
+        minpoint = 100
+        ratio = args.entity_overlap_thr
+        for scene in tqdm(self.scene_list):
+            if scene not in view_caption_corr_idx:
+                continue
+            frame_idx = view_caption_corr_idx[scene]
+            entity_caption[scene] = {}
+            entity_num = 0
+            frame_keys = list(frame_idx.keys())
+            for ii in range(len(frame_keys) - 1):
+                for jj in range(ii + 1, len(frame_keys)):
+                    idx1 = frame_idx[frame_keys[ii]].cpu().numpy()
+                    idx2 = frame_idx[frame_keys[jj]].cpu().numpy()
+                    c = view_entity_caption[scene][frame_keys[ii]].split(' ')
+                    c2 = view_entity_caption[scene][frame_keys[jj]].split(' ')
+                    if 'room' in c:  # remove this sweeping word
+                        c.remove('room')
+                    if 'room' in c2:
+                        c2.remove('room')
+
+                    old, new, intersection = self.compute_intersect_and_diff(idx1, idx2)
+                    old_c, new_c, intersection_c = self.compute_intersect_and_diff(c, c2)
+
+                    if len(intersection) > minpoint and len(intersection_c) > 0 and \
+                        len(intersection) / float(min(len(idx1), len(idx2))) <= ratio:
+                        entity_caption[scene]['entity_{}'.format(entity_num)] = ' '.join(list(intersection_c))
+                        # entity_caption_corr_idx[scene]['entity_{}'.format(entity_num)] = torch.IntTensor(list(intersection))
+                        entity_num += 1
+                    if len(old) > minpoint and len(old_c) > 0 and len(old) / float(len(idx1)) <= ratio:
+                        entity_caption[scene]['entity_{}'.format(entity_num)] = ' '.join(list(old_c))
+                        # entity_caption_corr_idx[scene]['entity_{}'.format(entity_num)] = torch.IntTensor(list(old))
+                        entity_num += 1
+                    if len(new) > minpoint and len(new_c) > 0 and len(new) / float(len(idx2)) <= ratio:
+                        entity_caption[scene]['entity_{}'.format(entity_num)] = ' '.join(list(new_c))
+                        # entity_caption_corr_idx[scene]['entity_{}'.format(entity_num)] = torch.IntTensor(list(new))
+                        entity_num += 1
+
+        return entity_caption
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('language model')
     parser.add_argument('--caption_model', default='nlpconnect/vit-gpt2-image-captioning',
@@ -301,30 +414,29 @@ if __name__ == '__main__':
     if args.dataset == 'scannet':
         processor = ScanNetProcessor(device)
     elif args.dataset == 's3dis':
-        # TODO: to support S3DIS generate caption
-        raise NotImplementedError
+        processor = S3DISProcessor(device)
     else:
         raise NotImplementedError
 
     if args.caption_mode == 'view_caption':
         """
         python -m tools.process_tools.generate_caption --dataset scannet \
-        --caption_mode view_caption \
-        --output_dir ./data/scannetv2/text_embed
+        --caption_mode view_caption --dataset_path ./data/scannetv2/\
+        --output_dir ./data/scannetv2/text_embed --image_tag scannet_frames_25k
         """
         processor.process_view_caption()
     elif args.caption_mode == 'scene_caption':
         """
         python -m tools.process_tools.generate_caption --dataset scannet \
-        --caption_mode scene_caption \
-        --output_dir ./data/scannetv2/text_embed
+        --caption_mode scene_caption --dataset_path ./data/scannetv2/\
+        --output_dir ./data/scannetv2/text_embed --image_tag scannet_frames_25k
         """
         processor.process_scene_caption()
     elif args.caption_mode == 'entity_caption':
         """
         python -m tools.process_tools.generate_caption --dataset scannet \
-        --caption_mode entity_caption \
-        --output_dir ./data/scannetv2/text_embed \
+        --caption_mode entity_caption --dataset_path ./data/scannetv2/\
+        --output_dir ./data/scannetv2/text_embed  --image_tag scannet_frames_25k\
         --view_caption_path ./data/scannetv2/text_embed/caption_view_scannet_vit-gpt2-image-captioning_25k.json \
         --view_caption_corr_idx_path ./data/scannetv2/scannetv2_view_vit-gpt2_matching_idx.pickle
         """

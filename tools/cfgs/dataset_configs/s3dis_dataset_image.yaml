@@ -52,7 +52,7 @@ DATA_PROCESSOR:
   rgb_norm: True
   point_range: 200000000
   voxel_scale: 50  # voxel_size = 1 / scale, scale 25(0.02m)
-  cache: True
+  cache: False
   max_npoint: 250000
   full_scale: [128, 512]
   voxel_mode: 4
@@ -68,3 +68,4 @@ DATA_PROCESSOR:
 IMAGE_PATH: s3dis_2d
 DEPTH_IMAGE_SCALE: [1080, 1080]
 LOAD_IMAGE: True
+MERGE_IDX: True

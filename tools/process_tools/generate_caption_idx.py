@@ -1,14 +1,16 @@
+import os, glob
 import json
-
-import numpy as np
 import tqdm
 import pickle
+import nltk
+
 import torch
 
 from functools import partial
 import concurrent.futures as futures
 
 from pcseg.datasets.scannet.scannet_dataset import ScanNetDataset
+from pcseg.datasets.s3dis.s3dis_dataset import S3DISDataset
 from pcseg.utils import common_utils, caption_utils
 
 
@@ -37,7 +39,7 @@ class CaptionIdxProcessor(object):
         return data_dict, scene_name, info
 
     def create_caption_idx(self, num_workers=16):
-        save_path = self.dataset.root_path / 'caption_idx'
+        save_path = self.dataset.root_path / '{}_view_matching_idx'.format(args.dataset)
         save_path.mkdir(parents=True, exist_ok=True)
 
         create_caption_idx_single_scene = partial(
@@ -47,8 +49,24 @@ class CaptionIdxProcessor(object):
 
         for idx, info in tqdm.tqdm(enumerate(self.infos), total=len(self.infos)):
             create_caption_idx_single_scene((info, idx))
+        # with futures.ThreadPoolExecutor(num_workers) as executor:
+        #     tqdm.tqdm(executor.map(
+        #             create_caption_idx_single_scene, self.infos, range(len(self.infos)),
+        #         ), total=len(self.infos))
 
-        self.merge_to_one_file(save_path)  # TODO
+        if dataset_cfg.get('MERGE_IDX', False):
+            new_save_path = str(save_path) + '.pkl'
+            self.merge_to_one_file(save_path, new_save_path)
+
+    def merge_to_one_file(self, save_path, new_save_path):
+        file_list = glob.glob(os.path.join(save_path, '*.pkl'))
+        merged_idx = {}
+        for fn in file_list:
+            fn_name = fn.split('/')[-1].split('.')[0]
+            data = pickle.load(open(fn, 'rb'))
+            merged_idx[fn_name] = data
+        with open(new_save_path, 'wb') as f:
+            pickle.dump(merged_idx, f)
 
     def create_caption_idx_single(self, info_with_idx, save_path):
         info, idx = info_with_idx
@@ -194,8 +212,11 @@ if __name__ == '__main__':
             training=True, logger=common_utils.create_logger()
         )
     elif args.dataset == 's3dis':
-        # TODO: to support S3DIS generate caption correponding index
-        raise NotImplementedError
+        dataset = S3DISDataset(
+            dataset_cfg=dataset_cfg, class_names=cfg.CLASS_NAMES,
+            root_path=ROOT_DIR / 'data' / 's3dis',
+            training=True, logger=common_utils.create_logger()
+        )
     else:
         raise NotImplementedError
 
