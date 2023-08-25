@@ -7,13 +7,13 @@ All the codes are tested in the following environment:
 
 #### Install dependent libraries
 a. Clone this repository.
-```shell
+```bash
 git clone https://github.com/CVMI-Lab/PLA.git
 ```
 
 b. Install the dependent libraries as follows:
 
-* Install the dependent python libraries: 
+* Install the dependent Python libraries (Please note that you need to install the correct version of `torch` and `spconv` according to your CUDA version): 
     ```bash
     pip install -r requirements.txt 
     ```
