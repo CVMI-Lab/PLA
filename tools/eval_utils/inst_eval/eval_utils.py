@@ -40,8 +40,8 @@ class ScanNetEval(object):
         dist_confs = [self.distance_confs[0]]
 
         # results: class x iou
-        ap = np.zeros((len(dist_threshes), len(self.eval_class_labels), len(ious)), np.float)
-        rc = np.zeros((len(dist_threshes), len(self.eval_class_labels), len(ious)), np.float)
+        ap = np.zeros((len(dist_threshes), len(self.eval_class_labels), len(ious)), np.float32)
+        rc = np.zeros((len(dist_threshes), len(self.eval_class_labels), len(ious)), np.float32)
         for di, (min_region_size, distance_thresh,
                  distance_conf) in enumerate(zip(min_region_sizes, dist_threshes, dist_confs)):
             for oi, iou_th in enumerate(ious):
@@ -74,7 +74,7 @@ class ScanNetEval(object):
 
                         cur_true = np.ones(len(gt_instances))
                         cur_score = np.ones(len(gt_instances)) * (-float('inf'))
-                        cur_match = np.zeros(len(gt_instances), dtype=np.bool)
+                        cur_match = np.zeros(len(gt_instances), dtype=bool)
                         # collect matches
                         for (gti, gt) in enumerate(gt_instances):
                             found_match = False

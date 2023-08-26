@@ -203,9 +203,13 @@ def main():
         common_utils.oss_data_client = common_utils.OSSClient()
         logger.info(f'Ceph client initialization with root path at {cfg.DATA_CONFIG.OSS_PATH}')
 
+    if cfg.get('TEXT_ENCODER', None) and cfg.TEXT_ENCODER.EXTRACT_EMBED:
+        class_names = cfg.TEXT_ENCODER.CATEGORY_NAMES
+    else:
+        class_names = cfg.CLASS_NAMES
     test_set, test_loader, sampler = build_dataloader(
         dataset_cfg=cfg.DATA_CONFIG,
-        class_names=cfg.CLASS_NAMES,
+        class_names=class_names,
         batch_size=args.batch_size,
         dist=dist_test, workers=args.workers, logger=logger, training=False
     )

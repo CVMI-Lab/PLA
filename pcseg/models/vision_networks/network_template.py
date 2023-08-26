@@ -80,7 +80,8 @@ class ModelTemplate(nn.Module):
             model_cfg=self.model_cfg.TASK_HEAD,
             in_channel=in_channel,
             ignore_label=self.dataset.ignore_label,
-            num_class=self.num_class
+            num_class=self.num_class,
+            valid_class_idx=self.dataset.valid_class_idx
         )
         model_info_dict['module_list'].append(task_head_module)
         return task_head_module, model_info_dict

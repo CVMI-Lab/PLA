@@ -65,7 +65,7 @@ class DatasetTemplate(torch_data.Dataset):
             self.valid_class_idx, self.ignore_label, squeeze_label=self.training)
 
         # caption config
-        if 'CAPTION_INFO' in self.dataset_cfg:
+        if self.training and 'CAPTION_INFO' in self.dataset_cfg:
             self.caption_cfg = self.dataset_cfg.CAPTION_INFO
             self.caption_keys = self.dataset_cfg.CAPTION_INFO.KEY
             self.caption = self.get_caption_items(self.caption_cfg)

@@ -61,3 +61,6 @@ MODEL:
       SCENE: 0.0
       VIEW: 0.08
       ENTITY: 0.02
+
+  INST_HEAD:
+    CORRECT_SEG_PRED_BINARY: Tru

@@ -78,6 +78,7 @@ class InstHead(nn.Module):
         else:
             self.train_sem_classes = self.valid_class_idx
         self.test_sem_classes = self.valid_class_idx
+        self.correct_seg_pred_binary = model_cfg.get('CORRECT_SEG_PRED_BINARY', True)
 
         self.forward_ret_dict = {}
 
@@ -118,7 +119,7 @@ class InstHead(nn.Module):
         binary_scores_list = []
 
         _semantic_scores = semantic_scores.clone()
-        if not self.training and binary_scores is not None:
+        if not self.training and binary_scores is not None and self.correct_seg_pred_binary:
             base_semantic_scores = semantic_scores[..., self.base_class_idx].softmax(dim=-1)
             novel_semantic_scores = semantic_scores[..., self.novel_class_idx].softmax(dim=-1)
             semantic_scores = semantic_scores.clone()
@@ -244,7 +245,7 @@ class InstHead(nn.Module):
         num_instances = cls_scores.size(0)
         num_points = semantic_scores.size(0)
 
-        if binary_scores is not None:
+        if self.correct_seg_pred_binary and binary_scores is not None:
             assert proposal_binary_scores is not None
             base_cls_scores = cls_scores[..., self.inst_base_class_idx].softmax(dim=-1)
             novel_cls_scores = cls_scores[..., self.inst_novel_class_idx].softmax(dim=-1)
@@ -292,7 +293,7 @@ class InstHead(nn.Module):
 
                 mask_pred = torch.zeros((num_instances, num_points), dtype=torch.int8, device='cuda')
                 mask_inds = cur_mask_scores > self.test_cfg.MASK_SCORE_THR
-                cur_proposals_idx = proposals_idx[mask_inds].long()
+                cur_proposals_idx = proposals_idx[mask_inds.cpu()].long()
                 mask_pred[cur_proposals_idx[:, 0], cur_proposals_idx[:, 1]] = 1
 
                 # filter low score instance

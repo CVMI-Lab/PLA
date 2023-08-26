@@ -215,7 +215,10 @@ class S3DISInstDataset(S3DISDataset):
         S3DISDataset.__init__(self, dataset_cfg, class_names, training, root_path, logger=logger)
         self.inst_class_idx = dataset_cfg.inst_class_idx
         self.inst_label_shift = dataset_cfg.inst_label_shift
-        if 'base_class_idx' in dataset_cfg:
+        if 'base_inst_class_idx' in dataset_cfg:
+            self.base_inst_class_idx = dataset_cfg.base_inst_class_idx
+            self.novel_inst_class_idx = dataset_cfg.novel_inst_class_idx
+        elif 'base_class_idx' in dataset_cfg:
             self.base_inst_class_idx = self.base_class_idx
             self.novel_inst_class_idx = self.novel_class_idx
         self.sem2ins_classes = dataset_cfg.sem2ins_classes

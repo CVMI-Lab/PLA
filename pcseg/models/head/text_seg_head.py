@@ -11,7 +11,7 @@ from pcseg.utils import common_utils
 
 
 class TextSegHead(nn.Module):
-    def __init__(self, model_cfg, in_channel, ignore_label, **kwargs):
+    def __init__(self, model_cfg, in_channel, ignore_label, valid_class_idx, **kwargs):
         super(TextSegHead, self).__init__()
         self.model_cfg = model_cfg
         self.in_channel = in_channel
@@ -36,14 +36,10 @@ class TextSegHead(nn.Module):
             param.requires_grad = False
 
         # open vocab
-        self.valid_class_idx = [i for i in range(len(cfg.CLASS_NAMES))]
+        self.valid_class_idx = valid_class_idx
         if hasattr(cfg.DATA_CONFIG, 'base_class_idx'):
             self.base_class_idx = cfg.DATA_CONFIG.base_class_idx
             self.novel_class_idx = cfg.DATA_CONFIG.novel_class_idx
-        if hasattr(cfg.DATA_CONFIG, 'ignore_class_idx'):
-            self.ignore_class_idx = cfg.DATA_CONFIG.ignore_class_idx
-            for i in self.ignore_class_idx:
-                self.valid_class_idx.remove(i)
 
         # remap category name for ambigous categories
         self.need_class_mapping = self.model_cfg.get('CLASS_MAPPING', False)
