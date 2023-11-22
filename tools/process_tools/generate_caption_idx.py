@@ -215,6 +215,6 @@ if __name__ == '__main__':
         --view_caption_path ./data/scannetv2/text_embed/caption_view_scannet_vit-gpt2-image-captioning_25k.json \
         --view_caption_corr_idx_path ./data/scannetv2/scannetv2_view_vit-gpt2_matching_idx.pickle
         """
-        processor.create_caption_idx(args.workers)
+        processor.create_entity_caption_idx(args.workers)
     else:
         raise NotImplementedError
