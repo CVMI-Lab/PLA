@@ -74,6 +74,7 @@ MODEL:
         CLS_SCORE_THR: 0.001
         MASK_SCORE_THR: -0.5
         MIN_NPOINT: 100
+        EVAL_TASKS: [instance]
 
     FIXED_MODULES: []
     SEMANTIC_ONLY: False
@@ -103,6 +104,7 @@ OPTIMIZATION:
   DIV_FACTOR: 2
   MOMS: [0.95, 0.85]
   LR_CLIP: 0.000001
+  SAVE_EPOCH: [20]
 
 OTHERS:
   PRINT_FREQ: 20
@@ -110,3 +112,6 @@ OTHERS:
   USE_AMP: True
   EVAL_FREQ: 5
   FIND_UNUSED_PARAMETERS: True
+
+OSS:
+  DATA: False

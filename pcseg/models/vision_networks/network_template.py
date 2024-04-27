@@ -23,7 +23,7 @@ class ModelTemplate(nn.Module):
         self.test_x4_split = dataset.dataset_cfg.DATA_PROCESSOR.get('x4_split', False)
 
         self.module_topology = [
-            'vfe', 'backbone_3d', 'adapter', 'binary_head', 'task_head', 'inst_head', 'caption_head'
+            'vfe', 'backbone_3d', 'adapter', 'binary_head', 'kd_head', 'task_head', 'inst_head', 'caption_head'
         ]
         self.module_list = self.build_networks()
 
@@ -80,8 +80,7 @@ class ModelTemplate(nn.Module):
             model_cfg=self.model_cfg.TASK_HEAD,
             in_channel=in_channel,
             ignore_label=self.dataset.ignore_label,
-            num_class=self.num_class,
-            valid_class_idx=self.dataset.valid_class_idx
+            num_class=self.num_class
         )
         model_info_dict['module_list'].append(task_head_module)
         return task_head_module, model_info_dict
@@ -94,13 +93,23 @@ class ModelTemplate(nn.Module):
             in_channel = self.model_cfg.TASK_HEAD.IN_CHANNEL
         else:
             in_channel = model_info_dict['backbone3d_out_channel']
+
+        if hasattr(self.dataset, 'base_inst_class_idx'):
+            base_inst_class_idx = self.dataset.base_inst_class_idx
+            novel_inst_class_idx = self.dataset.novel_inst_class_idx
+        else:
+            base_inst_class_idx = novel_inst_class_idx = None
+
         inst_head_module = head.__all__[self.model_cfg.INST_HEAD.NAME](
             model_cfg=self.model_cfg.INST_HEAD,
             in_channel=in_channel,
             inst_class_idx=self.dataset.inst_class_idx,
             sem2ins_classes=self.dataset.dataset_cfg.sem2ins_classes,
             valid_class_idx=self.dataset.valid_class_idx,
-            label_shift=self.dataset.inst_label_shift
+            label_shift=self.dataset.inst_label_shift,
+            ignore_label=self.dataset.ignore_label,
+            base_inst_class_idx=base_inst_class_idx,
+            novel_inst_class_idx=novel_inst_class_idx
         )
         model_info_dict['module_list'].append(inst_head_module)
         return inst_head_module, model_info_dict
@@ -140,6 +149,16 @@ class ModelTemplate(nn.Module):
         )
         model_info_dict['module_list'].append(caption_head_module)
         return caption_head_module, model_info_dict
+
+    def build_kd_head(self, model_info_dict):
+        if self.model_cfg.get('KD_HEAD', None) is None:
+            return None, model_info_dict
+
+        kd_head_module = head.__all__[self.model_cfg.KD_HEAD.NAME](
+            model_cfg=self.model_cfg.KD_HEAD
+        )
+        model_info_dict['module_list'].append(kd_head_module)
+        return kd_head_module, model_info_dict
 
     def forward(self, batch_dict):
         batch_dict['test_x4_split'] = self.test_x4_split
@@ -218,6 +237,8 @@ class ModelTemplate(nn.Module):
             model_state_disk = self.remap_keys_from_lai(model_state_disk)
         elif self.model_cfg.get('REMAP_FROM_NOADAPTER', None):
             model_state_disk = self.remap_keys_from_noadapter(model_state_disk)
+        elif self.model_cfg.get('REMAP_FROM_KDADAPTER', None):
+            model_state_disk = self.remap_keys_from_kdadapter(model_state_disk)
 
         state_dict, update_model_state = self._load_state_dict(model_state_disk, strict=False)
 
@@ -286,7 +307,7 @@ class ModelTemplate(nn.Module):
             elif first_name == 'blinear_final':
                 new_key = 'binary_head.binary_classifier.2' + key[len(first_name):]
             elif first_name == 'adapter':
-                new_key = 'task_head.' + key
+                new_key = 'adapter.' + key
             elif first_name == 'tiny_unet' or first_name == 'tiny_unet_outputlayer' or \
                 first_name == 'mask_linear' or first_name == 'iou_score_linear' or first_name == 'offset_linear':
                 new_key = 'inst_head.' + key
@@ -342,6 +363,28 @@ class ModelTemplate(nn.Module):
                 if name_list[1] == 'adapter':
                     new_key = 'adapter.adapter' + key[len(first_name)+len(name_list[1])+1:]
 
+            new_model_state[new_key] = model_state_disk[key]
+
+        return new_model_state
+
+    def remap_keys_from_kdadapter(self, model_state_disk):
+        """
+        To remap key from kd adapter version into this repo
+        Args:
+            model_state_disk:
+
+        Returns:
+
+        """
+        new_model_state = {}
+        for key in model_state_disk.keys():
+            name_list = key.split('.')
+            first_name = name_list[0]
+            new_key = key
+            if first_name in ['kd_head']:
+                if name_list[1] == 'kd_adapter':
+                    new_key = 'adapter.adapter' + key[len(first_name)+len(name_list[1])+len(name_list[2])+2:]
+                # print(key, new_key, model_state_disk[key].shape)
             new_model_state[new_key] = model_state_disk[key]
 
         return new_model_state

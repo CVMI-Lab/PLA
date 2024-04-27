@@ -1,5 +1,5 @@
 import functools
-
+import torch
 import torch.nn as nn
 import numpy as np
 
@@ -42,6 +42,10 @@ class VLAdapter(nn.Module):
         else:
             raise NotImplementedError
 
+        if self.model_cfg.get('MID_DIM', None) and self.model_cfg.MID_DIM != []:
+            mid_channel_list = self.model_cfg.MID_DIM
+            num_adapter_layers = len(mid_channel_list) - 1
+
         adapter = basic_block_1d.MLP(
             mid_channel_list,
             norm_fn=functools.partial(nn.BatchNorm1d, eps=1e-4, momentum=0.1),
@@ -60,6 +64,7 @@ class VLAdapter(nn.Module):
             adapter_feats = self.adapter(backbone3d_feats)
         else:
             adapter_feats = backbone3d_feats
+        torch.cuda.empty_cache()
 
         batch_dict['adapter_feats'] = adapter_feats
         return batch_dict

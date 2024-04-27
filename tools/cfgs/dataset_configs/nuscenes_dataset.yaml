@@ -1,0 +1,43 @@
+DATASET: 'NuScenesDataset'
+DATA_PATH: '../data/nuscenes'
+OSS_PATH: 'sh40:s3://PublicDatasets/nuscenes'
+
+VERSION: 'v1.0-trainval'
+MAX_SWEEPS: 1
+NUM_POINT_FEATURES: 4
+XYZ_NORM: True
+COLLATE_FN: collate_batch
+
+#POINT_CLOUD_RANGE: [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
+VOXEL_SIZE: [0.2, 0.2, 0.1]
+
+IGNORE_LABEL: 255
+
+DATA_SPLIT: {
+    'train': train,
+    'test': val
+}
+
+INFO_PATH: {
+    'train': [nuscenes_infos_1sweeps_train.pkl],
+    'test': [nuscenes_infos_1sweeps_val.pkl],
+}
+
+DATA_AUG:
+    AUG_LIST: [random_world_flip, random_world_rotation, random_world_scaling, random_world_translation ]
+
+    random_world_flip: True
+    random_world_rotation: True
+    random_world_scaling: [0.95, 1.05]
+    random_world_translation: [0.1, 0.1, 0.1]
+
+DATA_PROCESSOR:
+    PROCESS_LIST: []
+
+#    clip_points_outside_range: True
+
+#    - NAME: shuffle_points
+#      SHUFFLE_ENABLED: {
+#        'train': True,
+#        'test': False
+#      }

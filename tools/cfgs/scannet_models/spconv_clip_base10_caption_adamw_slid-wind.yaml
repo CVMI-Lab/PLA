@@ -1,0 +1,17 @@
+_BASE_CONFIG_: cfgs/scannet_models/spconv_clip_base10_caption_adamw.yaml
+
+
+DATA_CONFIG:  
+  CAPTION_INFO:
+
+    VIEW:
+      ENABLED: True
+      CAPTION_PATH: text_embed/caption_basic_crop_scannet_vit-gpt2-image-captioning_w400-500_overlap0.3.json
+      IMAGE_CORR_PATH: scannet_caption_idx_basic_crop.pkl
+      SELECT: ratio
+      NUM: 1
+      RATIO: 0.5
+      SAMPLE: 1
+      GATHER_CAPTION: True
+    
+    CAPTION_CORR_PATH_IN_ONE_FILE: True

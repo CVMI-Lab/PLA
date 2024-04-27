@@ -1,0 +1,8 @@
+_BASE_CONFIG_: cfgs/nuscenes_models/ov/sparseunet_clip_base12_v2_caption.yaml
+
+DATA_CONFIG:
+  VERSION: v1.0-mini
+  CAPTION_INFO:
+    VIEW:
+      CAPTION_PATH: text_embed/caption_view_nuscenes_v1.0-mini_vit-gpt2-image-captioning_.json
+

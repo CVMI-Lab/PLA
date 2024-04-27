@@ -1,0 +1,54 @@
+_BASE_CONFIG_: cfgs/s3dis_models/spconv_clip_adamw.yaml
+
+DATA_CONFIG:
+  ignore_class_idx: [0, 1, 2, 12 ]
+
+  CAPTION_INFO:
+
+    KEY: [SCENE, VIEW, ENTITY]
+    SCENE:
+      ENABLED: False
+      CAPTION_PATH: text_embed/caption.json
+    IMAGE_CORR_PATH: s3dis_matching_idx_5
+
+    VIEW:
+      ENABLED: True
+      CAPTION_PATH: text_embed/caption_2d.json
+      IMAGE_CORR_PATH: s3dis_matching_idx_5
+      SELECT: hybrid
+      NUM: 250
+      RATIO: 0.5
+      SAMPLE: 1
+      GATHER_CAPTION: False
+
+    ENTITY:
+      ENABLED: False
+      CAPTION_PATH: text_embed/caption_2d_intersect_v3.json
+      IMAGE_CORR_PATH: s3dis_matching_idx_5_intersect_v3
+      SELECT: ratio
+      NUM: 1
+      RATIO: 1.0
+
+    CAPTION_CORR_PATH_IN_ONE_FILE: False
+
+
+MODEL:
+  TASK_HEAD:
+    NAME: TextSegHead
+    CORRECT_SEG_PRED_BINARY: False
+    EVAL_ONLY: True
+
+  CAPTION_HEAD:
+    NAME: CaptionHead
+    POOLING_TYPE: avg
+    FEAT_NORM: False
+    LOGIT_SCALE:
+      value: 1.0
+      learnable: False
+    CUDA_ENABLED: True
+    POOL_OBJ: score  # need to modify with LOSS_FUNC
+    LOSS_FUNC: NLL_NoReduce  # point equal-weight loss
+    LOSS_WEIGHT:
+      SCENE: 0.1
+      VIEW: 1.0
+      ENTITY: 0.1

@@ -4,6 +4,7 @@ import torch
 
 from . import text_models
 from .prompt_template import template_meta
+from ...utils import common_utils
 from ...config import cfg
 
 
@@ -16,12 +17,16 @@ def build_text_model(model_cfg):
     return text_encoder
 
 
-def load_text_embedding_from_path(text_emb_cfg):
-    text_emb_path = os.path.join(cfg.DATA_CONFIG.DATA_PATH, text_emb_cfg.PATH)
-    text_embedding = torch.load(text_emb_path, map_location=torch.device('cpu')).detach()
+def load_text_embedding_from_path(text_emb_cfg, logger):
+    if common_utils.oss_data_client is not None:
+        text_emb_path = os.path.join(cfg.DATA_CONFIG.OSS_PATH, text_emb_cfg.PATH)
+        text_embedding = torch.load(common_utils.oss_data_client.get(text_emb_path), map_location=torch.device('cpu')).detach()
+    else:
+        text_emb_path = os.path.join(cfg.DATA_CONFIG.DATA_PATH, text_emb_cfg.PATH)
+        text_embedding = torch.load(text_emb_path, map_location=torch.device('cpu')).detach()
     if text_emb_cfg.get('NORM', True):
         text_embedding /= text_embedding.norm(dim=-1, keepdim=True)
-    print("=> loaded text embedding from path '{}'".format(text_emb_path))
+    logger.info("=> loaded text embedding from path '{}'".format(text_emb_path))
     return text_embedding
 
 

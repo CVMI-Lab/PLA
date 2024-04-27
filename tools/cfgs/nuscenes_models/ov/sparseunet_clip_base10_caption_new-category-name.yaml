@@ -1,0 +1,25 @@
+_BASE_CONFIG_: cfgs/nuscenes_models/ov/sparseunet_clip_base10_caption.yaml
+
+MODEL:
+  TASK_HEAD:
+    TEXT_EMBED:
+      NAME: CLIP
+      NORM: True
+      PATH: None
+
+  CAPTION_HEAD:
+    CUDA_ENABLED: False
+
+TEXT_ENCODER:
+  NAME: CLIP
+  BACKBONE: ViT-B/16  # ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14']
+  TEMPLATE: identity
+  EXTRACT_EMBED: True  # Online extract text embedding from class or not
+  CATEGORY_NAMES: [ 'barrier or fence', 'bicycle or bike or cycle', 'bus', 'car',
+                    'construction vehicle or bulldozer or excavator or concrete mixer or crane or dump truck’',
+                    'motorcycle or motorbike',
+                    'pedestrian or people or man or woman',
+                    'traffic cone', 'trailer', 'truck', 'road or street', 'other flat', 'sidewalk',
+                    'grass or rolling hills or soil or gravel',
+                    'building or wall or fence or pole or sign or traffic light',
+                    'bushes or plants or trees or potted plants' ]

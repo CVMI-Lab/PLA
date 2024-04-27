@@ -1,0 +1,14 @@
+_BASE_CONFIG_: cfgs/scannet_models/spconv_clip_base16_caption_detic.yaml
+
+DATA_CONFIG:
+  CAPTION_INFO:
+    VIEW:
+      ENABLED: True
+      CAPTION_PATH: text_embed/caption_detic_crop_cap_scannet_vit-gpt2-image-captioning_enlarge1.8_min8k_max25k.json
+      IMAGE_CORR_PATH: scannet_caption_idx_detic_crop_cap_enlarge1.8_min8k_max25k.pkl
+      SELECT: ratio
+      NUM: 1
+      RATIO: 0.5
+      SAMPLE: 1
+    
+    CAPTION_CORR_PATH_IN_ONE_FILE: True

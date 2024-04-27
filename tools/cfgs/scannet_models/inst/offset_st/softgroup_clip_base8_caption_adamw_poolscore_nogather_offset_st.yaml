@@ -1,0 +1,6 @@
+_BASE_CONFIG_: cfgs/scannet_models/inst/offset_st/softgroup_clip_base13_caption_adamw_poolscore_nogather_offset_st.yaml
+
+DATA_CONFIG:
+  base_class_idx: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 13 ]
+  novel_class_idx: [ 9, 10, 11, 12, 14, 15, 16, 17, 18 ]
+  ignore_class_idx: [ 19 ]

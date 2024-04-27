@@ -2,6 +2,7 @@ _BASE_CONFIG_: cfgs/scannet_models/spconv_clip_adamw.yaml
 
 
 DATA_CONFIG:
+  # TODO: make base + novel = all.
   base_class_idx: [ 0, 1, 2, 3, 4, 6, 7, 8, 10, 11, 13, 14, 15, 17, 18 ]
   novel_class_idx: [ 5, 9, 12, 16 ]
   ignore_class_idx: [ 19 ]
@@ -12,22 +13,23 @@ DATA_CONFIG:
   
     SCENE:
       ENABLED: False
-      CAPTION_PATH: text_embed/caption_scene_scannet_vit-gpt2-image-captioning_25k.json
+      CAPTION_PATH: text_embed/caption.json
       GATHER_CAPTION: True
 
     VIEW:
       ENABLED: True
-      CAPTION_PATH: text_embed/caption_view_scannet_vit-gpt2-image-captioning_25k.json
-      IMAGE_CORR_PATH: caption_idx/scannetv2_view_vit-gpt2_matching_idx.pickle
+      CAPTION_PATH: text_embed/caption_2d.json
+      IMAGE_CORR_PATH: scannetv2_matching_idx.pickle
       SELECT: ratio
       NUM: 1
       RATIO: 0.5
+      SAMPLE: 1
       GATHER_CAPTION: True
 
     ENTITY:
-      ENABLED: True
-      CAPTION_PATH: text_embed/caption_entity_scannet_vit-gpt2-image-captioning_25k.json
-      IMAGE_CORR_PATH: caption_idx/scannetv2_entity_vit-gpt2_matching_idx.pickle
+      ENABLED: False
+      CAPTION_PATH: text_embed/caption_2d_intersect_v3.json
+      IMAGE_CORR_PATH: scannetv2_matching_idx_intersect_v3.pickle
       SELECT: ratio
       NUM: 1
       RATIO: 1.0
@@ -54,12 +56,19 @@ MODEL:
 
   CAPTION_HEAD:
     NAME: CaptionHead
+    POOLING_TYPE: avg
     FEAT_NORM: True
     LOGIT_SCALE:
       value: 100.0
       learnable: True
+    CUDA_ENABLED: True
+    POOL_OBJ: feat
     LOSS_FUNC: CrossEntropy
     LOSS_WEIGHT:
-      SCENE: 0.0
-      VIEW: 0.05
-      ENTITY: 0.05
+      SCENE: 0.1
+      VIEW: 0.1
+      ENTITY: 0.1
+
+    DIV_N_CAP: False
+    DIV_MODE: none # [none, square, log2]
+    NOVEL_GRAD_ONLY: False

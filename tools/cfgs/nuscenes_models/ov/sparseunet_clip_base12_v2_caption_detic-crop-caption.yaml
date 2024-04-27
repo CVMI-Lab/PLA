@@ -1,0 +1,13 @@
+_BASE_CONFIG_: cfgs/nuscenes_models/ov/sparseunet_clip_base12_v2_caption_detic-pred-raw.yaml
+
+DATA_CONFIG:
+  CAPTION_INFO:
+    VIEW:
+      CAPTION_PATH: text_embed/caption_detic_crop_cap_nuscenes_v1.0-trainval_vit-gpt2-image-captioning_.json
+      IMAGE_CORR_PATH: nuscenes_caption_idx_detic_crop_cap.pkl
+
+TEXT_ENCODER:
+  EXTRACT_EMBED: True  # Online extract text embedding from class or not
+  CATEGORY_NAMES: [ 'barrier', 'bicycle', 'bus', 'car', 'construction vehicle', 'motorcycle', 'pedestrian',
+                    'traffic cone', 'trailer', 'truck', 'driveable surface', 'other flat',
+                    'sidewalk', 'terrain', 'manmade', 'vegetation' ]

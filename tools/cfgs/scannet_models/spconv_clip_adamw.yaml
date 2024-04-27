@@ -26,7 +26,7 @@ MODEL:
   ADAPTER:
     NAME: VLAdapter
     EVAL_ONLY: False
-    NUM_ADAPTER_LAYERS: 2
+    NUM_ADAPTER_LAYERS: 1
     TEXT_DIM: -1
     LAST_NORM: True
 

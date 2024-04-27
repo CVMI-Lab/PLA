@@ -23,8 +23,6 @@ def get_input(opt):
         label_file = os.path.join(opt.data_root, '{}_pth'.format(opt.split), opt.room_name + '.pth')
 
         xyz, rgb, alpha, face_indices = read_ply(input_file)
-        # If there is no need to write a PLY file, the input file containing xyz and rgb information can be ignored, 
-        # and this information can instead be read directly from the label_file.
         _, _, label, inst_label, *_ = torch.load(label_file)
         label[label == -100] = 20
         data_dict = {'xyz': xyz, 'rgb': rgb, 'label': label, 'inst_label': inst_label}
@@ -82,6 +80,9 @@ def get_coords_color(opt):
         rgb = label_pred_rgb
 
     elif (opt.task == 'offset_semantic_pred'):
+        # semantic_file = os.path.join(opt.prediction_path, 'semantic_label', opt.room_name + '.npy')
+        # assert os.path.isfile(semantic_file), 'No semantic result - {}.'.format(semantic_file)
+        # label_pred = np.load(semantic_file).astype(int)  # 0~19
         label = label.astype(int)
         label_pred_rgb = np.zeros(rgb.shape)
         label_pred_rgb[label >= 0] = np.array(
@@ -94,6 +95,9 @@ def get_coords_color(opt):
         xyz[inst_label >= 0] += offset_coords[inst_label >= 0]
 
     elif (opt.task == 'offset_semantic_gt'):
+        # semantic_file = os.path.join(opt.prediction_path, 'semantic_label', opt.room_name + '.npy')
+        # assert os.path.isfile(semantic_file), 'No semantic result - {}.'.format(semantic_file)
+        # label_pred = np.load(semantic_file).astype(int)  # 0~19
         label = label.astype(int)
         label_rgb = np.zeros(rgb.shape)
         label_rgb[label >= 0] = np.array(
@@ -107,6 +111,7 @@ def get_coords_color(opt):
 
     # same color order according to instance pointnum
     elif (opt.task == 'instance_gt'):
+        # print(np.unique(inst_label))
         inst_label = inst_label.astype(int)
         print('Instance number: {}'.format(inst_label.max() + 1))
         inst_label_rgb = np.zeros(rgb.shape)
@@ -153,6 +158,60 @@ def get_coords_color(opt):
                 _sort_id % len(COLOR_DETECTRON2)]
 
         rgb = inst_label_pred_rgb
+
+    elif (opt.task == 'box'):
+        instance_file = os.path.join(opt.prediction_path, 'pred_instance', opt.room_name + '.txt')
+        assert os.path.isfile(instance_file), 'No instance result - {}.'.format(instance_file)
+        f = open(instance_file, 'r')
+        masks = f.readlines()
+        masks = [mask.rstrip().split() for mask in masks]
+        ins_num = len(masks)
+        scores = np.array([float(x[-1]) for x in masks])
+        sort_inds = np.argsort(scores)[::-1]
+        vis_list = []
+        for i_ in range(len(masks) - 1, -1, -1):
+            i = sort_inds[i_]
+            mask_path = os.path.join(opt.prediction_path, 'pred_instance', masks[i][0])
+            assert os.path.isfile(mask_path), mask_path
+            # if (float(masks[i][2]) < 0.09):
+            #     continue
+            mask = np.array(open(mask_path).read().splitlines(), dtype=int)
+            print('{} {}: pointnum: {}'.format(i, masks[i], mask.sum()))
+            # ins_pointnum[i] = mask.sum()
+            # if float(masks[i][2]) < 0.2:
+            min_bound, max_bound = xyz[mask == 1].min(0), xyz[mask == 1].max(0)
+            if SEMANTIC_IDX2NAME[int(masks[i][1])] == 'bookshelf':
+                vis_list.append([min_bound, max_bound, np.array(CLASS_COLOR[SEMANTIC_IDX2NAME[int(masks[i][1])]])])
+            # inst_label[mask == 1] = i
+        data_dict['vis_list'] = vis_list
+
+        label = label.astype(int)
+        label_rgb = np.zeros(rgb.shape)
+        label_rgb[label >= 0] = np.array(
+            itemgetter(*SEMANTIC_NAMES[label[label >= 0]])(CLASS_COLOR))
+        rgb = label_rgb
+
+    elif opt.task == 'saliency':
+        saliency_file = os.path.join(opt.prediction_path, 'logit', opt.room_name + '.npy')
+        saliency = np.load(saliency_file)
+        saliency = saliency[..., opt.class_id].reshape(-1, 1)
+        saliency /= saliency.max()
+        saliency = np.clip(saliency * 1.0 * 255.0, a_min=0, a_max=255).astype(np.uint8)
+        mask = saliency[..., 0] > 0.5 * 255.0
+        _attn_color = cv2.applyColorMap(saliency, cv2.COLORMAP_JET)  # (B, G, R)
+        _attn_color = _attn_color.reshape(-1, 3)[..., ::-1]
+        rgb = (_attn_color * 0.5 + rgb * 0.5).astype(np.uint8)
+
+    elif opt.task == 'grad':
+        grad_file = os.path.join(opt.prediction_path, 'grad', opt.room_name + '.npy')
+        grad = np.load(grad_file)
+        idx = (grad.sum(1) != 0).nonzero()[0]
+        click_idx = idx[300]
+        sim = grad @ grad[click_idx].T / (np.linalg.norm(grad[click_idx]) + 1e-12) / (np.linalg.norm(grad, axis=-1) + 1e-12)
+        sim = np.clip(((sim) * 255.0), a_min=0, a_max=255).astype(np.uint8)
+        _attn_color = cv2.applyColorMap(sim, cv2.COLORMAP_JET)  # (B, G, R)
+        _attn_color = _attn_color.reshape(-1, 3)[..., ::-1]
+        rgb = (_attn_color * 0.5 + rgb * 0.5).astype(np.uint8)
 
     data_dict['xyz'] = xyz
     data_dict['rgb'] = rgb
@@ -217,6 +276,10 @@ if __name__ == '__main__':
             rooms = sorted(os.listdir(opt.prediction_path + '/pred_instance'))
         elif opt.task == 'semantic_pred':
             rooms = sorted(os.listdir(opt.prediction_path + '/semantic_pred'))
+        elif opt.task == 'saliency':
+            rooms = sorted(os.listdir(opt.prediction_path + '/logit'))
+        elif opt.task == 'gradient':
+            rooms = sorted(os.listdir(opt.prediction_path + '/grad'))
         elif opt.task == 'offset_semantic_pred':
             rooms = sorted(os.listdir(opt.prediction_path + '/offset_pred'))
         elif opt.task == 'offset_semantic_gt':

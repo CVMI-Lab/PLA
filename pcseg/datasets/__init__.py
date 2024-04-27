@@ -8,6 +8,9 @@ from pcseg.utils import common_utils
 from .dataset import DatasetTemplate
 from .scannet.scannet_dataset import ScanNetDataset, ScanNetInstDataset
 from .s3dis.s3dis_dataset import S3DISDataset, S3DISInstDataset
+from .nuscenes.nuscenes_dataset import NuScenesDataset, NuScenesPanopticDataset
+from .stpls3d.stpls3d_dataset import STPLS3DDataset, STPLS3DInstDataset
+from .kitti.kitti_dataset import KittiDataset, KittiPanopticDataset
 
 
 __all__ = {
@@ -15,7 +18,13 @@ __all__ = {
     'ScanNetDataset': ScanNetDataset,
     'ScanNetInstDataset': ScanNetInstDataset,
     'S3DISDataset': S3DISDataset,
-    'S3DISInstDataset': S3DISInstDataset
+    'S3DISInstDataset': S3DISInstDataset,
+    'NuScenesDataset': NuScenesDataset,
+    'NuScenesPanopticDataset': NuScenesPanopticDataset,
+    'KittiDataset': KittiDataset,
+    'KittiPanopticDataset': KittiPanopticDataset,
+    'STPLS3DDataset': STPLS3DDataset,
+    'STPLS3DInstDataset': STPLS3DInstDataset
 }
 
 
@@ -43,7 +52,7 @@ class DistributedSampler(_DistributedSampler):
 
 def build_dataloader(dataset_cfg, class_names, batch_size, dist, root_path=None, workers=4, seed=None,
                      logger=None, training=True, merge_all_iters_to_one_epoch=False, total_epochs=0,
-                     multi_epoch_loader=False):
+                     multi_epoch_loader=False, split=None):
 
     dataset = __all__[dataset_cfg.DATASET](
         dataset_cfg=dataset_cfg,
@@ -51,6 +60,7 @@ def build_dataloader(dataset_cfg, class_names, batch_size, dist, root_path=None,
         root_path=root_path,
         training=training,
         logger=logger,
+        split=split
     )
 
     if merge_all_iters_to_one_epoch:
@@ -73,12 +83,28 @@ def build_dataloader(dataset_cfg, class_names, batch_size, dist, root_path=None,
 
     dataloader = loader(
         dataset, batch_size=batch_size, pin_memory=True, num_workers=workers,
-        shuffle=(sampler is None) and training, drop_last=training, sampler=sampler,
+        shuffle=(sampler is None) and training, drop_last=False, sampler=sampler,
         collate_fn=getattr(dataset, dataset_cfg.COLLATE_FN),
         timeout=0, worker_init_fn=partial(common_utils.worker_init_fn, seed=seed)
     )
 
     return dataset, dataloader, sampler
+
+
+class MultiEpochsDataLoader(torch.utils.data.DataLoader):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._DataLoader__initialized = False
+        self.batch_sampler = _RepeatSampler(self.batch_sampler)
+        self._DataLoader__initialized = True
+        self.iterator = super().__iter__()
+
+    def __len__(self):
+        return len(self.batch_sampler.sampler)
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield next(self.iterator)
 
 
 class _RepeatSampler(object):

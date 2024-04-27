@@ -1,0 +1,8 @@
+_BASE_CONFIG_: cfgs/scannet_models/spconv_clip_base15_caption_adamw.yaml
+
+MODEL:
+  CAPTION_HEAD:
+    CUDA_ENABLED: True
+
+OTHERS:
+  USE_AMP: False

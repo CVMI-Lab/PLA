@@ -44,7 +44,7 @@ def elastic(x, gran, mag):
     return x + g(x) * mag
 
 
-def scene_aug(aug, xyz, rgb=None):
+def scene_aug(aug, xyz, xyz_affi=None, rgb=None):
     assert xyz.ndim == 2
     m = np.eye(3)
     if check_key(aug.jitter):
@@ -66,6 +66,8 @@ def scene_aug(aug, xyz, rgb=None):
             np.random.shuffle(rot_mats)
         m = np.matmul(m, rot_mats[0].dot(rot_mats[1]).dot(rot_mats[2]))
     xyz = np.matmul(xyz, m)
+    if xyz_affi is not None:
+        xyz_affi = np.matmul(xyz_affi, m)
     if check_key(aug.random_jitter) and check_p(aug.random_jitter):
         if aug.random_jitter.accord_to_size:
             jitter_scale = (xyz.max(0) - xyz.min(0)).mean() * 0.1
@@ -73,15 +75,18 @@ def scene_aug(aug, xyz, rgb=None):
             jitter_scale = aug.random_jitter.value
         random_noise = (np.random.rand(xyz.shape[0], xyz.shape[1]) - 0.5) * jitter_scale
         xyz += random_noise
+        if xyz_affi is not None:
+            xyz_affi += random_noise
     if check_key(aug.scaling_scene) and check_p(aug.scaling_scene):
         scaling_fac = np.random.rand() * (aug.scaling_scene.value[1] - aug.scaling_scene.value[0]) \
                       + aug.scaling_scene.value[0]
         xyz_center = (xyz.max(0) + xyz.min(0)) / 2.0
         xyz = (xyz - xyz_center) * scaling_fac + xyz_center
-
+        if xyz_affi is not None:
+            xyz_affi = (xyz_affi - xyz_center) * scaling_fac + xyz_center
     if rgb is not None and check_key(aug.color_jitter):
         rgb += np.random.randn(3) * 0.1
-    return xyz, rgb
+    return xyz, xyz_affi, rgb
 
 
 def crop(xyz, full_scale, max_npoint, step=32):

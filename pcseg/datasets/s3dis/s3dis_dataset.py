@@ -2,7 +2,6 @@ import SharedArray as SA
 import os
 import numpy as np
 import pickle
-import json
 import torch
 
 from ..indoor_dataset import IndoorDataset
@@ -10,13 +9,16 @@ from ...utils.common_utils import sa_create, sa_delete
 
 
 class S3DISDataset(IndoorDataset):
-    def __init__(self, dataset_cfg, class_names, training, root_path, logger=None):
+    def __init__(self, dataset_cfg, class_names, training, root_path, logger=None, split=None):
         super(S3DISDataset, self).__init__(
-            dataset_cfg, class_names, training, root_path, logger=logger
+            dataset_cfg, class_names, training, root_path, logger=logger, split=split
         )
 
-        data_list = sorted(os.listdir(self.root_path / 'stanford_indoor3d_inst/'))
-        data_list = [item[:-4] for item in data_list if 'Area_' in item]
+        # data_list = sorted(os.listdir(self.root_path / 'stanford_indoor3d_inst/'))
+        # data_list = [item[:-4] for item in data_list if 'Area_' in item]
+        with open(os.path.join(dataset_cfg.DATA_SPLIT['root'], f's3dis_{dataset_cfg.DATA_SPLIT[self.mode]}.txt'), 'r') as fin:
+            data_list = sorted(fin.readlines())
+        data_list = [d.strip() for d in data_list]
         if dataset_cfg.DATA_SPLIT[self.mode] == 'train':
             self.data_list = [item for item in data_list if not 'Area_{}'.format(dataset_cfg.DATA_SPLIT.test_area) in item]
         else:
@@ -27,18 +29,11 @@ class S3DISDataset(IndoorDataset):
         self.put_data_to_shm()
 
         if self.training and hasattr(self, 'caption_cfg') and self.caption_cfg.get('CAPTION_CORR_PATH_IN_ONE_FILE', True):
-            self.scene_image_corr_infos, self.scene_image_corr_entity_infos = self.include_caption_infos()
-
-        self.load_image = self.dataset_cfg.get('LOAD_IMAGE', None)
-        self.depth_image_scale = self.dataset_cfg.get('DEPTH_IMAGE_SCALE', None)
-        self.image_path = self.dataset_cfg.get('IMAGE_PATH', None)
-
-        if self.load_image:
-            self.pc_mins = json.load(open(str(self.root_path / 'pc_min.json')))
+            self.scene_image_corr_infos, self.scene_image_corr_entity_infos = self.include_point_caption_idx()
 
         self.logger.info(
-            "Totally {} samples in {} set.".format(
-                len(self.data_list) * (self.repeat if self.training else 1), self.mode))
+            "Totally {} samples in {} set.".format(len(self.data_list) * (self.repeat if self.training else 1),
+                                                   self.mode))
 
     def __len__(self):
         return len(self.data_list) * (self.repeat if self.training else 1)
@@ -46,17 +41,24 @@ class S3DISDataset(IndoorDataset):
     def put_data_to_shm(self):
         for item in self.data_list:
             if self.cache and not os.path.exists("/dev/shm/{}".format(item)):
-                data_path = os.path.join(self.root_path / 'stanford_indoor3d_inst', item + '.npy')
-                data = np.load(data_path)  # xyzrgbli, N*8
+                data = self._load_data(item)
                 sa_create("shm://{}".format(item), data)
 
+    def _load_data(self, item):
+        if self.oss_client:
+            data_path = os.path.join(self.oss_root_path, 'stanford_indoor3d_inst', item + '.npy')
+        else:
+            data_path = os.path.join(self.root_path / 'stanford_indoor3d_inst', item + '.npy')
+        data = np.load(data_path if not self.oss_client else self.oss_client.get(data_path))  # xyzrgbli, N*8
+
+        return data
+        
     def load_data(self, index):
         fn = self.data_list[index]
         if self.cache:
             data = SA.attach("shm://{}".format(fn)).copy()
         else:
-            data_path = os.path.join(self.root_path / 'stanford_indoor3d_inst', fn + '.npy')
-            data = np.load(data_path)
+            data = self._load_data(fn)
 
         xyz_all, rgb_all, label_all, inst_label_all = data[:, 0:3], data[:, 3:6], data[:, 6], data[:, 7]
 
@@ -83,6 +85,7 @@ class S3DISDataset(IndoorDataset):
         return xyz_all, rgb_all, label_all, inst_label_all, binary_label_all
 
     def __getitem__(self, item):
+
         if (not self.training) and self.test_x4_split:
             if 'custom_voxelization_mean' in self.dataset_cfg.DATA_PROCESSOR.PROCESS_LIST:
                 return self.get_test_item_vox_lai(item)
@@ -122,6 +125,17 @@ class S3DISDataset(IndoorDataset):
             'binary_labels': binary_label, 'origin_idx': origin_idx, 'pc_count': pc_count,
             'caption_data': caption_data, 'ids': index, 'scene_name': scene_name
         }
+
+        # === instance pseudo offset label ====
+        if self.training and hasattr(self, 'pseudo_label_dir'):
+            # print(self.pseudo_label_dir)
+            index = item % len(self.data_list)
+            fn = self.data_list[index]
+            pseudo_offset = self.load_pseudo_labels(fn.split('/')[-1], dtype=np.float, shape=(-1, 3))
+            pseudo_offset = pseudo_offset[subsample_idx]
+            data_dict['pt_offset_mask'] = (pseudo_offset == 0).sum(1) != 3
+            # pseudo_offset[(pseudo_offset == 0).sum(1) == 3] = -100.
+            data_dict['pseudo_offset_target'] = xyz + pseudo_offset
 
         if self.training:
             # perform augmentations
@@ -206,19 +220,17 @@ class S3DISDataset(IndoorDataset):
             return
 
         for item in self.data_list:
-            if os.path.exists("/dev/shm/{}".format(item)):
-                sa_delete("shm://{}".format(item))
+            if os.path.exists("/dev/shm/{}_nn".format(item)):
+                sa_delete("shm://{}_nn".format(item))
 
 
 class S3DISInstDataset(S3DISDataset):
-    def __init__(self, dataset_cfg, class_names, training, root_path, logger=None):
-        S3DISDataset.__init__(self, dataset_cfg, class_names, training, root_path, logger=logger)
+    def __init__(self, dataset_cfg, class_names, training, root_path, logger=None, split=None):
+        S3DISDataset.__init__(self, dataset_cfg, class_names, training, root_path, logger=logger, split=split)
         self.inst_class_idx = dataset_cfg.inst_class_idx
         self.inst_label_shift = dataset_cfg.inst_label_shift
-        if 'base_inst_class_idx' in dataset_cfg:
-            self.base_inst_class_idx = dataset_cfg.base_inst_class_idx
-            self.novel_inst_class_idx = dataset_cfg.novel_inst_class_idx
-        elif 'base_class_idx' in dataset_cfg:
+        if 'base_class_idx' in dataset_cfg:
+            # instance seg, all instances
             self.base_inst_class_idx = self.base_class_idx
             self.novel_inst_class_idx = self.novel_class_idx
         self.sem2ins_classes = dataset_cfg.sem2ins_classes
@@ -235,6 +247,11 @@ class S3DISInstDataset(S3DISDataset):
         if self.training and inst_label.max() < 0:
             return S3DISInstDataset.__getitem__(self, np.random.randint(self.__len__()))
         info = self.get_inst_info(points, inst_label.astype(np.int32), label)
+        if self.training and hasattr(self, 'pseudo_label_dir'):
+            # print('update pseudo label')
+            info['pt_offset_label'][binary_label == 0] = (data_dict['pseudo_offset_target'] - points)[binary_label == 0]
+            data_dict['pt_offset_mask'] = (data_dict['pt_offset_mask'] & (binary_label == 0)) | (inst_label != self.ignore_label)
+            del data_dict['pseudo_offset_target']
         data_dict['inst_label'] = inst_label
         data_dict.update(info)
         return data_dict

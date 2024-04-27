@@ -1,0 +1,33 @@
+_BASE_CONFIG_: cfgs/nuscenes_models/ov/sparseunet_clip_base12_caption_detic-pred-raw.yaml
+
+DATA_CONFIG:
+  CAPTION_INFO:
+    VIEW:
+      CAPTION_PATH: text_embed/caption_detic_crop_cap_nuscenes_v1.0-trainval_vit-gpt2-image-captioning_.json
+      IMAGE_CORR_PATH: nuscenes_caption_idx_detic_crop_cap.pkl
+
+    ENTITY:
+      ENABLED: True
+      CAPTION_PATH: text_embed/caption_basic_crop_nuscenes_v1.0-trainval_vit-gpt2-image-captioning_w400-500_overlap0.3.json
+      IMAGE_CORR_PATH: nuscenes_caption_idx_basic_crop.pkl
+      SELECT: ratio
+      NUM: 1
+      RATIO: 1.0
+
+MODEL:
+  CAPTION_HEAD:
+    LOSS_WEIGHT:
+      SCENE: 0.1
+      VIEW: 0.05
+      ENTITY: 0.05
+
+TEXT_ENCODER:
+  EXTRACT_EMBED: True  # Online extract text embedding from class or not
+  CATEGORY_NAMES: [ 'barrier or fence', 'bicycle or bike or cycle', 'bus', 'car',
+                    'construction vehicle or bulldozer or excavator or concrete mixer or crane or dump truck’',
+                    'motorcycle or motorbike',
+                    'pedestrian or people or man or woman',
+                    'traffic cone', 'trailer', 'truck', 'road or street', 'other flat', 'sidewalk',
+                    'grass or rolling hills or soil or gravel',
+                    'building or wall or fence or pole or sign or traffic light',
+                    'bushes or plants or trees or potted plants' ]

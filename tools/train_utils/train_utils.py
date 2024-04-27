@@ -3,8 +3,11 @@ import os
 import datetime
 import torch
 import time
+from pathlib import Path
+import re
 
 from pcseg.utils import common_utils, commu_utils, caption_utils
+from pcseg.utils import pseudo_label_utils
 from pcseg.config import cfg
 from pcseg.models import load_data_to_gpu
 from tools.eval_utils import eval_utils
@@ -42,6 +45,8 @@ def train_one_epoch(args, model, optimizer, train_loader, lr_scheduler, accumula
     scaler = torch.cuda.amp.GradScaler(enabled=args.use_amp)
 
     for cur_it in range(total_it_each_epoch):
+        if (cur_it + 1) == len(train_loader):  # manually drop last samples
+            continue
         try:
             batch = next(dataloader_iter)
         except StopIteration:
@@ -90,6 +95,8 @@ def train_one_epoch(args, model, optimizer, train_loader, lr_scheduler, accumula
 
         loss = ret_dict['loss'].mean()
         scaler.scale(loss).backward()
+        if cfg.OPTIMIZATION.get('CLIP_GRAD_NORM', None):
+            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.OPTIMIZATION.CLIP_GRAD_NORM)
         scaler.step(optimizer)
         scaler.update()
 
@@ -170,7 +177,8 @@ def train_one_epoch(args, model, optimizer, train_loader, lr_scheduler, accumula
 
 def train_model(args, model, optimizer, train_loader, val_loader, lr_scheduler, optim_cfg, start_epoch, start_iter, 
                 rank, tb_log, ckpt_save_dir, task, train_sampler=None, caption_items=None, lr_warmup_scheduler=None, 
-                logger=None, best_metric=None, best_epoch=None, dist_train=None, text_encoder=None, arnold=None):
+                logger=None, best_metric=None, best_epoch=None, dist_train=None, text_encoder=None,
+                pseudo_train_loader=None):
     accumulated_iter = start_iter
     total_it_each_epoch = len(train_loader)
     if args.merge_all_iters_to_one_epoch:
@@ -188,6 +196,13 @@ def train_model(args, model, optimizer, train_loader, val_loader, lr_scheduler, 
     for cur_epoch in range(start_epoch, args.epochs):
         if train_sampler is not None:
             train_sampler.set_epoch(cur_epoch)
+
+        # pseudo label generation
+        if cfg.get('OFFSET_ST', False):
+            pseudo_label_utils.generate_and_set_pseudo_labels(
+                cfg.OFFSET_ST, args, logger, Path(*ckpt_save_dir.parts[:-1]) / cfg.OFFSET_ST.PSEUDO_LABEL_DIR,
+                train_loader, pseudo_train_loader, model, cur_epoch, key=['pt_offsets'], rank=rank, dist=dist_train
+            )
 
         # train one epoch
         if lr_warmup_scheduler is not None and cur_epoch < optim_cfg.WARMUP_EPOCH:
@@ -213,7 +228,7 @@ def train_model(args, model, optimizer, train_loader, val_loader, lr_scheduler, 
         if not args.occupy:
             save_trained_model(
                 model, optimizer, accumulated_iter, trained_epoch, args.epochs, args.ckpt_save_interval, rank,
-                ckpt_save_dir, args.max_ckpt_save_num, best_metric, best_epoch, logger, arnold=arnold
+                ckpt_save_dir, args.max_ckpt_save_num, best_metric, best_epoch, logger
             )
 
         if trained_epoch == args.epochs or trained_epoch % args.eval_freq == 0:
@@ -228,15 +243,21 @@ def train_model(args, model, optimizer, train_loader, val_loader, lr_scheduler, 
                     os.remove(best_metric_record)
                 (ckpt_save_dir / f'Best_metric_{best_metric:.4f}_in_epoch_{best_epoch}.txt').touch()
 
+    if cfg.get('OFFSET_ST', False) and not cfg.OFFSET_ST.KEEP_PSEUDO_LABEL:
+        os.system('rm -rf {}'.format(Path(*ckpt_save_dir.parts[:-1]) / cfg.OFFSET_ST.PSEUDO_LABEL_DIR))
+
 
 def save_trained_model(model, optimizer, accumulated_iter, trained_epoch, total_epochs, ckpt_save_interval, rank,
-                       ckpt_save_dir, max_ckpt_save_num, best_metric, best_epoch, logger, arnold=None):
-    if rank == 0 and (trained_epoch == total_epochs or trained_epoch % ckpt_save_interval == 0):
+                       ckpt_save_dir, max_ckpt_save_num, best_metric, best_epoch, logger):
+    if rank == 0 and (trained_epoch == total_epochs or trained_epoch % ckpt_save_interval == 0 or \
+        (cfg.OPTIMIZATION.get('SAVE_EPOCH', False) and trained_epoch in cfg.OPTIMIZATION.SAVE_EPOCH)):
         ckpt_list = glob.glob(str(ckpt_save_dir / 'checkpoint_epoch_*.pth'))
         ckpt_list.sort(key=os.path.getmtime)
 
         if ckpt_list.__len__() >= max_ckpt_save_num:
             for cur_file_idx in range(0, len(ckpt_list) - max_ckpt_save_num + 1):
+                if int(re.findall(r'\d+', os.path.basename(ckpt_list[cur_file_idx]))[0]) in cfg.OPTIMIZATION.get('SAVE_EPOCH', []):
+                    continue
                 os.remove(ckpt_list[cur_file_idx])
 
         ckpt_name = ckpt_save_dir / ('checkpoint_epoch_%d' % trained_epoch)
@@ -251,7 +272,6 @@ def save_trained_model(model, optimizer, accumulated_iter, trained_epoch, total_
         save_checkpoint(
             checkpoint_state(model, optimizer, trained_epoch, accumulated_iter, best_metric, best_epoch), filename=ckpt_name,
         )
-        arnold.save_ckpt(str(ckpt_name) + '.pth', last_epoch=True)
 
 
 def model_state_to_cpu(model_state):

@@ -59,18 +59,22 @@ class DataAugmentor(object):
 
     def scene_aug(self, data_dict=None, config=None):
         if self.check_func(config) and self.check_data(data_dict):
-            data_dict['points_xyz'], data_dict['rgb'] = augmentor_utils.scene_aug(
-                config, data_dict['points_xyz'], data_dict['rgb']
+            data_dict['points_xyz'], data_dict['pseudo_offset_target'], data_dict['rgb'] = augmentor_utils.scene_aug(
+                config, data_dict['points_xyz'], data_dict.get('pseudo_offset_target', None), data_dict['rgb']
             )
             if data_dict['points_xyz'].shape[0] == 0:
                 data_dict['valid'] = False
+            if data_dict.get('pseudo_offset_target', None) is None:
+                del data_dict['pseudo_offset_target']
         return data_dict
 
     @staticmethod
     def update_data_dict(data_dict, idx):
         for key in data_dict:
             if key in ['points_xyz', 'points', 'points_xyz_voxel_scale', 'rgb', 'labels',
-                       'inst_label', 'binary_labels', 'origin_idx']:
+                       'inst_label', 'binary_labels', 'origin_idx', 'adapter_feats',
+                       'adapter_feats_mask', 'kd_labels', 'kd_labels_mask',
+                       'pseudo_offset_target', 'super_voxel', 'pt_offset_mask']:
                 if data_dict[key] is not None:
                     data_dict[key] = data_dict[key][idx]
         return data_dict
@@ -80,16 +84,15 @@ class DataAugmentor(object):
         return augmentor_utils.check_key(key) and augmentor_utils.check_p(key)
 
     def elastic(self, data_dict=None, config=None):
-        data_dict['points_xyz_voxel_scale'] = data_dict['points_xyz'] * self.kwargs['voxel_scale']
+        data_dict['points_xyz_voxel_scale'] = data_dict['points_xyz'] * self.kwargs['voxel_scale'] / self.kwargs['voxel_down']
         if self.check_func(config) and self.check_data(data_dict):
             for (gran_fac, mag_fac) in config.value:
                 data_dict['points_xyz_voxel_scale'] = augmentor_utils.elastic(
-                    data_dict['points_xyz_voxel_scale'], gran_fac * self.kwargs['voxel_scale'] // 50,
-                    mag_fac * self.kwargs['voxel_scale'] / 50
+                    data_dict['points_xyz_voxel_scale'], gran_fac, mag_fac / self.kwargs['voxel_down']
                 )
-            if config.apply_to_feat:
-                data_dict['points_xyz'] = data_dict['points_xyz_voxel_scale'] / self.kwargs['voxel_scale']
-
+            # if config.apply_to_feat:
+            #     data_dict['points_xyz'] = data_dict['points_xyz_voxel_scale'] / self.kwargs['voxel_scale']
+            data_dict['points_xyz_voxel_scale']  = data_dict['points_xyz_voxel_scale'] * self.kwargs['voxel_down']
         # offset
         data_dict['points'] = data_dict['points_xyz_voxel_scale'] / self.kwargs['voxel_scale']
         data_dict['points_xyz_voxel_scale'] -= data_dict['points_xyz_voxel_scale'].min(0)
@@ -109,43 +112,66 @@ class DataAugmentor(object):
         c, s = np.cos(rotate_rad), np.sin(rotate_rad)
         j = np.matrix([[c, s], [-s, c]])
         data_dict['points'][:, :2] = np.dot(points[:, :2], j)
-
+        if data_dict.get('pseudo_offset_target', None) is not None:
+            data_dict['pseudo_offset_target'][:, :2] = np.dot(data_dict['pseudo_offset_target'][:, :2], j)
         return data_dict
 
     @staticmethod
     def random_world_flip(data_dict=None, config=None):
         points = data_dict['points']
+        if data_dict.get('pseudo_offset_target', None) is not None:
+            pseudo_offset_targets = data_dict['pseudo_offset_target']
         flip_type = np.random.choice(4, 1)
 
         if flip_type == 0:
             # flip x only
             points[:, 0] = -points[:, 0]
+            if data_dict.get('pseudo_offset_target', None) is not None:
+                pseudo_offset_targets[:, 0] = -pseudo_offset_targets[:, 0]
         elif flip_type == 1:
             # flip y only
             points[:, 1] = -points[:, 1]
+            if data_dict.get('pseudo_offset_target', None) is not None:
+                pseudo_offset_targets[:, 1] = -pseudo_offset_targets[:, 1]
         elif flip_type == 2:
             # flip x+y
             points[:, :2] = -points[:, :2]
+            if data_dict.get('pseudo_offset_target', None) is not None:
+                pseudo_offset_targets[:, :2] = -pseudo_offset_targets[:, :2]
 
         data_dict['points'] = points
+        if data_dict.get('pseudo_offset_target', None) is not None:
+            data_dict['pseudo_offset_target'] = pseudo_offset_targets
         return data_dict
 
     @staticmethod
     def random_world_scaling(data_dict=None, config=None):
         points = data_dict['points']
+        if data_dict.get('pseudo_offset_target', None) is not None:
+            pseudo_offset_targets = data_dict['pseudo_offset_target']
         noise_scale = np.random.uniform(config[0], config[1])
         points[:, :2] = noise_scale * points[:, :2]
+        if data_dict.get('pseudo_offset_target', None) is not None:
+            pseudo_offset_targets[:, :2] = noise_scale * pseudo_offset_targets[:, :2]
 
         data_dict['points'] = points
+        if data_dict.get('pseudo_offset_target', None) is not None:
+            data_dict['pseudo_offset_target'] = pseudo_offset_targets
         return data_dict
 
     @staticmethod
     def random_world_translation(data_dict=None, config=None):
         points = data_dict['points']
+        if data_dict.get('pseudo_offset_target', None) is not None:
+            pseudo_offset_targets = data_dict['pseudo_offset_target']
         noise_translate = np.array(
             [np.random.normal(0, config[0], 1), np.random.normal(0, config[1], 1), np.random.normal(0, config[2], 1)]
         ).T
         points[:, 0:3] += noise_translate
+        if data_dict.get('pseudo_offset_target', None) is not None:
+            pseudo_offset_targets[:, 0:3] += noise_translate
 
         data_dict['points'] = points
+        if data_dict.get('pseudo_offset_target', None) is not None:
+            data_dict['pseudo_offset_target'] = pseudo_offset_targets
         return data_dict

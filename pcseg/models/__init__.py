@@ -31,11 +31,14 @@ def load_data_to_gpu(batch_dict):
             batch_dict[key] = batch_dict[key].cuda()
         elif not isinstance(val, np.ndarray) or key in ['calib', 'point_img_idx', 'point_img']:
             continue
-        elif key in ['ids', 'metadata', 'scene_name']:
+        elif key in ['ids', 'scan_id', 'metadata', 'scene_name', 'n_captions_points', 
+                     'image_shape', 'cam']:
             continue
-        elif key in ['points_xyz_voxel_scale', 'labels', 'inst_label', 'origin_idx', 'offsets', 'inst_cls']:
+        elif key in ['points_xyz_voxel_scale', 'labels', 'inst_label', 'origin_idx', 'offsets', 'inst_cls', 'super_voxel']:
             batch_dict[key] = torch.from_numpy(val).long().cuda()
         elif key in ['inst_pointnum', 'batch_idxs']:
             batch_dict[key] = torch.from_numpy(val).int().cuda()
+        elif key in ['adapter_feats_mask', 'kd_labels_mask', 'pt_offset_mask']:
+            batch_dict[key] = torch.from_numpy(val).bool().cuda()
         else:
             batch_dict[key] = torch.from_numpy(val).float().cuda()

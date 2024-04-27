@@ -1,0 +1,40 @@
+_BASE_CONFIG_: cfgs/scannet_models/zs/spconv_clip_caption_kd.yaml
+
+DATA_CONFIG:
+
+  CAPTION_INFO:
+    SCENE:
+      GATHER_CAPTION: False
+    
+    VIEW:
+      GATHER_CAPTION: False
+
+    ENTITY:
+      GATHER_CAPTION: False
+
+MODEL:
+
+  CAPTION_HEAD:
+    NAME: CaptionHead
+    POOLING_TYPE: avg
+    FEAT_NORM: True
+    LOGIT_SCALE:
+      value: 100.0
+      learnable: True
+    CUDA_ENABLED: True
+    POOL_OBJ: score  # need to modify with LOSS_FUNC
+    LOSS_FUNC: NLL_NoReduce  # point equal-weight loss
+    LOSS_WEIGHT:
+      SCENE: 0.1
+      VIEW: 0.1
+      ENTITY: 0.1
+
+TEXT_ENCODER:
+  NAME: CLIP
+  BACKBONE: ViT-B/32  # ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14']
+  TEMPLATE: lseg
+  EXTRACT_EMBED: True  # Online extract text embeding from class or not
+  CATEGORY_NAMES: [wall, floor, cabinet, bed, chair, sofa, table, door, window, bookshelf, picture, counter, desk,
+                   curtain, refrigerator, showercurtain, toilet, sink, bathtub, otherfurniture]
+#  BERT:
+#  BACKBONE: bert-base-uncased

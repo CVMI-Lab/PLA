@@ -1,0 +1,9 @@
+_BASE_CONFIG_: cfgs/scannet_models/spconv_clip_base15_caption.yaml
+
+TEXT_ENCODER:
+  NAME: CLIP
+  BACKBONE: ViT-B/32  # ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14']
+  TEMPLATE: lseg
+  EXTRACT_EMBED: True
+  CATEGORY_NAMES: [wall, floor, cabinet, bed, chair, sofa, table, door, window, bookshelf, picture, counter, desk,
+                   curtain, refrigerator, showercurtain, toilet, sink, bathtub, otherfurniture]

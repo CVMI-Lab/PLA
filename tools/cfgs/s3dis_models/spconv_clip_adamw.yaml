@@ -25,7 +25,7 @@ MODEL:
   ADAPTER:
     NAME: VLAdapter
     EVAL_ONLY: False
-    NUM_ADAPTER_LAYERS: 2
+    NUM_ADAPTER_LAYERS: 1
     TEXT_DIM: -1
     LAST_NORM: True
     FEAT_NORM: False
@@ -66,9 +66,13 @@ OPTIMIZATION:
   DIV_FACTOR: 1
   MOMS: [0.95, 0.85]
   LR_CLIP: 0.000001
+  SAVE_EPOCH: []
 
 OTHERS:
   PRINT_FREQ: 20
   EVAL_FREQ: 5
   SYNC_BN: False
   USE_AMP: True
+
+OSS:
+  DATA: False

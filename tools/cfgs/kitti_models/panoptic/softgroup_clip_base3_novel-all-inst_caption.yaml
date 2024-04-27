@@ -1,0 +1,7 @@
+_BASE_CONFIG_: cfgs/kitti_models/panoptic/softgroup_clip_base4_caption.yaml
+
+DATA_CONFIG:
+  stuff_class_idx: [0, 1, 2, 4, 5, 6, 7, 8, 9, 10]  # remove 3
+  base_class_idx: [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 13, 14, 15, 17, 18]
+  novel_class_idx: [11, 12, 16]
+  ignore_class_idx: [3]

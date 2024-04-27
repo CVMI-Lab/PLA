@@ -1,5 +1,6 @@
-DATA_PATH: ../data/s3dis
+DATA_PATH: ../data/s3dis/
 DATASET: S3DISDataset
+OSS_PATH: 'sh40:s3://PublicDatasets/s3dis'
 
 COLLATE_FN: collate_batch_indoor
 MIN_SPATIAL_SCALE: 128
@@ -9,6 +10,7 @@ DATA_SPLIT:
   test: val
   data_suffix: .npy
   test_area: 5
+  root: ../data/split_files
 
 IGNORE_LABEL: -100
 

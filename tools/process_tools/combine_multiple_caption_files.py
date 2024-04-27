@@ -49,19 +49,32 @@ def merge_caption_idx_with_path_list(caption_idx_path_list, caption_idx_save_pat
         caption_idx = pickle.load(open(caption_idx_path, 'rb'))
         caption_idx_list.append(caption_idx)
 
+    # for each scene
     for i in tqdm.tqdm(range(len(caption_idx_list[0]))):
         scene_caption = {}
         scene_caption_infos = {}
         counter = 0
+        # for each caption idx file
         for _, caption_idx in enumerate(caption_idx_list):
-            if 'scene_name' not in scene_caption:
-                scene_caption['scene_name'] = caption_idx[i]['scene_name']
-
-            new_image_name_list = [f'{counter + i}' for i in range(len(caption_idx[i]['infos']))]
-            new_scene_caption_idx = replace_dict_keys_with_new_keys(caption_idx[i]['infos'], new_image_name_list)
+            if isinstance(caption_idx, list):
+                if 'scene_name' not in scene_caption:
+                    scene_caption['scene_name'] = caption_idx[i]['scene_name']
+                else:
+                    assert scene_caption['scene_name'] == caption_idx[i]['scene_name']
+                new_image_name_list = [f'{counter + j}' for j in range(len(caption_idx[i]['infos']))]
+                new_scene_caption_idx = replace_dict_keys_with_new_keys(caption_idx[i]['infos'], new_image_name_list)
+                counter += len(caption_idx[i]['infos'])
+            elif isinstance(caption_idx, dict):
+                caption_idx_keys = list(caption_idx.keys())
+                if 'scene_name' not in scene_caption:
+                    scene_caption['scene_name'] = caption_idx_keys[i]
+                else:
+                    assert scene_caption['scene_name'] == caption_idx_keys[i]
+                new_image_name_list = [f'{counter + j}' for j in range(len(caption_idx[caption_idx_keys[i]]))]
+                new_scene_caption_idx = replace_dict_keys_with_new_keys(caption_idx[caption_idx_keys[i]], new_image_name_list)
+                counter += len(caption_idx[caption_idx_keys[i]])
 
             scene_caption_infos.update(new_scene_caption_idx)
-            counter += len(caption_idx[i]['infos'])
 
         scene_caption['infos'] = scene_caption_infos
         new_caption_idx.append(scene_caption)
@@ -73,20 +86,21 @@ def merge_caption_idx_with_path_list(caption_idx_path_list, caption_idx_save_pat
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('')
     parser.add_argument('--caption_path_list',
-                        default=['data/nuscenes/text_embed/caption_basic_crop_nuscenes_v1.0-mini_vit-gpt2-image'
-                                 '-captioning_w400-500_overlap0.3.json',
-                                 'data/nuscenes/text_embed/caption_detic_crop_cap_nuscenes_v1.0-mini_vit-gpt2-image'
-                                 '-captioning_.json'],
-                        type=list, help='')
+                        default=['data/scannetv2/text_embed/caption_dense_scannet_kosmos2_25k.json',
+                                 'data/scannetv2/text_embed/caption_detic_crop_matching_idx.json'],
+                        nargs='+', help='')
     parser.add_argument('--caption_idx_path_list',
-                        default=['data/nuscenes/v1.0-mini/nuscenes_caption_idx_basic_crop.pkl',
-                                 'data/nuscenes/v1.0-mini/nuscenes_caption_idx_detic_crop_cap.pkl'],
-                        type=list, help='')
+                        default=['data/scannetv2/scannetv2_caption_idx_kosmos2_densecap_25k.pkl',
+                                 'data/scannetv2/scannetv2_detic_crop_matching_idx.pickle'],
+                        nargs='+', help='')
     parser.add_argument('--caption_save_path', required=True, type=str, help='')
     parser.add_argument('--caption_idx_save_path', required=True, type=str, help='')
 
     args = parser.parse_args()
 
+    print(f'caption_path_list: {args.caption_path_list}')
+    print(f'caption_idx_path_list: {args.caption_idx_path_list}')
+    
     print('Start to merge captions ........')
     merge_captions_with_path_list(args.caption_path_list, args.caption_save_path)
     print('Finish merging captions ........')

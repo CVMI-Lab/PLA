@@ -13,7 +13,10 @@ class_names = {
                 'showercurtain', 'toilet', 'sink', 'bathtub', 'otherfurniture'],
     's3dis': ['ceiling', 'floor', 'wall', 'beam', 'column',
               'window', 'door', 'table', 'chair', 'sofa',
-              'bookcase', 'board', 'clutter']
+              'bookcase', 'board', 'clutter'],
+    'nuscenes': ['barrier', 'bicycle', 'bus', 'car', 'construction vehicle', 'motorcycle', 'pedestrian',
+                 'traffic cone', 'trailer', 'truck', 'driveable surface', 'other flat',
+                 'sidewalk', 'terrain', 'manmade', 'vegetation']
 }
 
 

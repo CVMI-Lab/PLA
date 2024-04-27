@@ -40,8 +40,8 @@ class ScanNetEval(object):
         dist_confs = [self.distance_confs[0]]
 
         # results: class x iou
-        ap = np.zeros((len(dist_threshes), len(self.eval_class_labels), len(ious)), np.float32)
-        rc = np.zeros((len(dist_threshes), len(self.eval_class_labels), len(ious)), np.float32)
+        ap = np.zeros((len(dist_threshes), len(self.eval_class_labels), len(ious)), np.float)
+        rc = np.zeros((len(dist_threshes), len(self.eval_class_labels), len(ious)), np.float)
         for di, (min_region_size, distance_thresh,
                  distance_conf) in enumerate(zip(min_region_sizes, dist_threshes, dist_confs)):
             for oi, iou_th in enumerate(ious):
@@ -74,7 +74,7 @@ class ScanNetEval(object):
 
                         cur_true = np.ones(len(gt_instances))
                         cur_score = np.ones(len(gt_instances)) * (-float('inf'))
-                        cur_match = np.zeros(len(gt_instances), dtype=bool)
+                        cur_match = np.zeros(len(gt_instances), dtype=np.bool)
                         # collect matches
                         for (gti, gt) in enumerate(gt_instances):
                             found_match = False
@@ -340,7 +340,7 @@ class ScanNetEval(object):
             novel_class_idx = val_set.novel_class_idx
             base_inst_class_idx = val_set.base_inst_class_idx
             novel_inst_class_idx = val_set.novel_inst_class_idx
-
+            # ====== base ======
             metrics = [[] for _ in range(7)]
             for ii, label_name in enumerate((np.array(self.eval_class_labels)[base_inst_class_idx]).tolist()):
                 ap_avg  = avgs["classes"][label_name]["ap"] * 100
@@ -358,6 +358,7 @@ class ScanNetEval(object):
             line = self.getline('base_average', [np.nanmean(i) for i in metrics])
             logger.info(line)
             logger.info("=" * lineLen)
+            # ====== novel ======
             metrics = [[] for _ in range(7)]
             for ii, label_name in enumerate((np.array(self.eval_class_labels)[novel_inst_class_idx]).tolist()):
                 ap_avg  = avgs["classes"][label_name]["ap"] * 100

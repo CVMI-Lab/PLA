@@ -1,5 +1,6 @@
 DATA_PATH: ../data/scannetv2
 DATASET: ScanNetDataset
+OSS_PATH: 'sh40:s3://PublicDatasets/scannetv2'
 
 COLLATE_FN: collate_batch_indoor
 MIN_SPATIAL_SCALE: 128
@@ -8,6 +9,7 @@ DATA_SPLIT:
   train: train
   test: val
   data_suffix: .pth
+  root: ../data/split_files
 
 IGNORE_LABEL: -100
 
@@ -60,3 +62,5 @@ DATA_PROCESSOR:
   rgb_as_feat: True
 
   PROCESS_LIST: []
+
+NEED_SV: False

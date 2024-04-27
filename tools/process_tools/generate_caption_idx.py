@@ -1,14 +1,18 @@
+import os
 import json
 
 import numpy as np
 import tqdm
 import pickle
 import torch
+import cv2
 
 from functools import partial
 import concurrent.futures as futures
 
+from pcseg.datasets.nuscenes.nuscenes_dataset import NuScenesDataset
 from pcseg.datasets.scannet.scannet_dataset import ScanNetDataset
+from pcseg.datasets.kitti.kitti_dataset import KittiDataset
 from pcseg.utils import common_utils, caption_utils
 
 
@@ -28,8 +32,8 @@ class CaptionIdxProcessor(object):
             data_dict = {'points': points}
         elif hasattr(self.dataset, 'load_data'):
             xyz, _, _, _, _ = self.dataset.load_data(idx)
-            scene_name = info.split('/')[-1].split('.')[0]
-            info = {'scene_name': scene_name, 'depth_image_size': self.dataset.depth_image_scale}
+            scene_name = self.dataset.get_data_list()[idx].split('/')[-1].split('.')[0]
+            info = {'scene_name': scene_name, 'depth_image_size': self.dataset.depth_image_scale, 'idx': idx}
             data_dict = {'points_xyz': xyz, 'scene_name': scene_name}
         else:
             raise NotImplementedError
@@ -48,8 +52,6 @@ class CaptionIdxProcessor(object):
         for idx, info in tqdm.tqdm(enumerate(self.infos), total=len(self.infos)):
             create_caption_idx_single_scene((info, idx))
 
-        self.merge_to_one_file(save_path)  # TODO
-
     def create_caption_idx_single(self, info_with_idx, save_path):
         info, idx = info_with_idx
 
@@ -65,89 +67,113 @@ class CaptionIdxProcessor(object):
         with open(scene_caption_save_path, 'wb') as f:
             pickle.dump(scene_caption_idx, f)
 
-    def create_entity_caption_idx(self, num_workers=16):
-        caption_save_path = self.dataset.root_path / 'caption_idx_{}.pickle'.format(args.tag)
-        # save_path.mkdir(parents=True, exist_ok=True)
+    def create_caption_idx_with_crop(self, save_path, detic_crop_info_path=None, window_size=None,
+                                     overlap_ratio=None, num_workers=16):
+        if detic_crop_info_path is not None:
+            detic_crop_infos = pickle.load(open(detic_crop_info_path, 'rb'))
+        else:
+            detic_crop_infos = [None] * len(self.infos)
 
-        captions_entity_corr_idx = {}
-        view_caption = json.load(open(args.view_caption_path, 'r'))
-        view_caption_corr_idx = pickle.load(open(args.view_caption_corr_idx_path, 'rb'))
-        # res = self.model.predict_step(img_path)
-        view_entity_caption = self.extract_entity(view_caption)
-        captions_entity_corr_idx = self.get_entity_caption_corr_idx(
-            view_entity_caption, view_caption_corr_idx
-        )
+        if window_size is not None:
+            window_size = np.array(window_size)
+            strides = (int(window_size[0] * (1 - overlap_ratio)), int(window_size[1] * (1 - overlap_ratio)))
+            create_caption_idx_single_scene = partial(
+                self.create_caption_idx_with_crop_single,
+                window_size=window_size,
+                strides=strides
+            )
+        else:
+            create_caption_idx_single_scene = self.create_caption_idx_with_crop_single
 
-        with open(caption_save_path, 'wb') as f:
-            pickle.dump(captions_entity_corr_idx, f)
+        with futures.ThreadPoolExecutor(num_workers) as executor:
+            detic_crop_caption_idx = list(
+                tqdm.tqdm(executor.map(
+                    create_caption_idx_single_scene, self.infos, range(len(self.infos)), detic_crop_infos
+                ), total=len(self.infos))
+            )
 
-    @staticmethod
-    def extract_entity(view_caption):
-        caption_entity = {}
-        for scene in view_caption:
-            for frame in view_caption[scene]:
-                caption = view_caption[scene][frame]
-                tokens = nltk.word_tokenize(caption)
-                tagged = nltk.pos_tag(tokens)
-                entities = []
-                # entities = nltk.chunk.ne_chunk(tagged)
-                for e in tagged:
-                    if e[1].startswith('NN'):
-                        entities.append(e[0])
-                new_caption = ' '.join(entities)
-                caption_entity[scene][frame] = new_caption
-        return caption_entity
+        with open(save_path, 'wb') as f:
+            pickle.dump(detic_crop_caption_idx, f)
 
-    @staticmethod
-    def compute_intersect_and_diff(c1, c2):
-        old = set(c1) - set(c2)
-        new = set(c2) - set(c1)
-        intersect = set(c1) & set(c2)
-        return old, new, intersect
+    def create_caption_idx_with_crop_single(self, info, idx, detic_infos=None, window_size=None, strides=None):
+        if isinstance(info, dict):
+            scene_name = info['lidar_path'].split('.')[0].replace('/', '_')
+        else:
+            scene_name = info.split('/')[-1].split('.')[0]
 
-    def get_entity_caption_corr_idx(self, view_entity_caption, view_caption_corr_idx):
-        entity_caption = {}
-        entity_caption_corr_idx = {}
+        if detic_infos is not None:
+            assert detic_infos['scene_name'] == scene_name
 
-        minpoint = 100
-        ratio = args.entity_overlap_thr
+        data_dict, scene_name, info = self.get_lidar(info, idx)
 
-        for scene in tqdm.tqdm(view_caption_corr_idx):
-            assert scene in view_entity_caption
-            frame_idx = view_caption_corr_idx[scene]
-            entity_caption[scene] = {}
-            entity_caption_corr_idx[scene] = {}
-            entity_num = 0
-            frame_keys = list(frame_idx.keys())
-            for ii in range(len(frame_keys) - 1):
-                for jj in range(ii + 1, len(frame_keys)):
-                    idx1 = frame_idx[frame_keys[ii]].cpu().numpy()
-                    idx2 = frame_idx[frame_keys[jj]].cpu().numpy()
-                    c = view_entity_caption[scene][frame_keys[ii]].split(' ')
-                    c2 = view_entity_caption[scene][frame_keys[jj]].split(' ')
-                    if 'room' in c:  # remove this sweeping word
-                        c.remove('room')
-                    if 'room' in c2:
-                        c2.remove('room')
+        scene_caption_idx = {'scene_name': scene_name, 'infos': {}, 'boxes': {}}
+        data_dict = self.dataset.get_image(info, data_dict)
 
-                    old, new, intersection = self.compute_intersect_and_diff(idx1, idx2)
-                    old_c, new_c, intersection_c = self.compute_intersect_and_diff(c, c2)
+        # for each image
+        image_name_list = list(data_dict['point_img_idx'].keys())
+        custom_image_shape = None
+        if args.use_custom_image_path:
+            image_path = os.path.join(args.custom_image_path, scene_name, 'color', image_name_list[0] + '.jpg')
+            assert os.path.exists(image_path)
+            image = cv2.imread(image_path)
+            custom_image_shape = image.shape
 
-                    if len(intersection) > minpoint and len(intersection_c) > 0 and \
-                        len(intersection) / float(min(len(idx1), len(idx2))) <= ratio:
-                        entity_caption[scene]['entity_{}'.format(entity_num)] = ' '.join(list(intersection_c))
-                        entity_caption_corr_idx[scene]['entity_{}'.format(entity_num)] = torch.IntTensor(list(intersection))
-                        entity_num += 1
-                    if len(old) > minpoint and len(old_c) > 0 and len(old) / float(len(idx1)) <= ratio:
-                        entity_caption[scene]['entity_{}'.format(entity_num)] = ' '.join(list(old_c))
-                        entity_caption_corr_idx[scene]['entity_{}'.format(entity_num)] = torch.IntTensor(list(old))
-                        entity_num += 1
-                    if len(new) > minpoint and len(new_c) > 0 and len(new) / float(len(idx2)) <= ratio:
-                        entity_caption[scene]['entity_{}'.format(entity_num)] = ' '.join(list(new_c))
-                        entity_caption_corr_idx[scene]['entity_{}'.format(entity_num)] = torch.IntTensor(list(new))
-                        entity_num += 1
+        for image_name in image_name_list:
+            image_name = image_name.lower()
+            image_shape = data_dict['image_shape'][image_name]
+            if custom_image_shape is not None:
+                image_shape = custom_image_shape
 
-        return entity_caption_corr_idx
+            if detic_infos is not None:
+                if image_name in detic_infos['infos']:
+                    image_detic_pred = detic_infos['infos'][image_name]
+                    boxes = image_detic_pred['boxes']
+                else:
+                    continue
+            else:
+                boxes = caption_utils.get_sliding_windows(image_shape, window_size, strides)
+
+            if boxes.shape[0] == 0:
+                continue
+
+            point_img = data_dict['point_img'][image_name]  # (x, y)
+            if data_dict.get('depth_image_size', None):
+                # rescale point image if depth image size not match real image
+                scale = np.array(image_shape[:2]) / np.array(data_dict['depth_image_size'])
+                point_img = point_img * scale
+
+            point_img_idx = torch.from_numpy(data_dict['point_img_idx'][image_name]).int()
+            # enlarge boxes with a ratio
+            if args.enlarge_box_ratio > 1:
+                boxes = caption_utils.enlarge_boxes_size(
+                    boxes, args.enlarge_box_ratio, args.enlarge_boxes_max_thresh, image_shape
+                )
+
+            # filter by boxes size
+            if args.filter_by_image_size:
+                boxes_size = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+                boxes_size_max_mask = boxes_size >= args.min_image_crop_area * args.enlarge_box_ratio
+                boxes = boxes[boxes_size_max_mask]
+
+            selected_boxes = []
+            valid_boxes_counter = 0
+            for i in range(boxes.shape[0]):
+                y_min, x_min, y_max, x_max = boxes[i]
+                x_mask = np.logical_and(x_min < point_img[:, 0], point_img[:, 0] < x_max)
+                y_mask = np.logical_and(y_min < point_img[:, 1], point_img[:, 1] < y_max)
+                mask = np.logical_and(x_mask, y_mask)
+                crop_point_img_idx = point_img_idx[mask]
+                # filter empty captions
+                if args.filter_empty_caption and crop_point_img_idx.shape[0] == 0:
+                    continue
+                crop_name = f'{image_name}_{valid_boxes_counter}'
+                valid_boxes_counter += 1
+                scene_caption_idx['infos'][crop_name] = crop_point_img_idx
+                selected_boxes.append(boxes[i])
+
+            scene_caption_idx['boxes'][image_name] = np.array(selected_boxes)
+
+        return scene_caption_idx
 
 
 if __name__ == '__main__':
@@ -165,16 +191,27 @@ if __name__ == '__main__':
     parser.add_argument('--version', type=str, default='v1.0-trainval', help='')
     parser.add_argument('--workers', type=int, default=8, help='')
 
+    parser.add_argument('--detic_info_path', type=str, help='')
     parser.add_argument('--save_path', type=str, help='')
 
     # filters
     parser.add_argument('--filter_by_image_size', action='store_true', default=False, help='')
     parser.add_argument('--filter_empty_caption', action='store_true', default=False, help='')
 
-    # entity caption
-    parser.add_argument('--entity_overlap_thr', default=0.3, help='threshold ratio for filtering out large entity-level point set')
-    parser.add_argument('--view_caption_path', default=None, help='path for view-level caption')
-    parser.add_argument('--view_caption_corr_idx_path', default=None, help='path for view-level caption corresponding index')
+    # for basic crop caption
+    parser.add_argument('--window_size', default=(400, 500), type=tuple, help='window size for cropping sub images')
+    parser.add_argument('--overlap_ratio', default=0.3, type=float, help='overlap ratio when crop images')
+    parser.add_argument('--use_custom_image_shape', action='store_true', default=False, help='')
+    parser.add_argument('--custom_image_shape', default=(968, 1296, 3), type=tuple, help='given image shape')
+    parser.add_argument('--use_custom_image_path', action='store_true', default=False, help='')
+    parser.add_argument('--custom_image_path', default='data/scannetv2/scannet_images_125k_1296', type=str, help='')
+
+    # for detic crop caption
+    parser.add_argument('--min_image_crop_area', default=3000, type=int, help='minimal image crop size')
+    parser.add_argument('--enlarge_boxes_max_thresh', default=8000, type=int, help='maximum size that dont need a enlarge')
+    parser.add_argument('--enlarge_box_ratio', default=1.0, type=float, help='enlarge the box with a ratio')
+
+    parser.add_argument('--oss_data', action='store_true', default=False, help='')
 
     global args
     args = parser.parse_args()
@@ -182,39 +219,93 @@ if __name__ == '__main__':
     ROOT_DIR = (Path(__file__).resolve().parent / '../../').resolve()
     print(ROOT_DIR)
     dataset_cfg = EasyDict(yaml.safe_load(open(args.cfg_file)))
-    dataset_cfg.VERSION = args.version
+    if args.dataset in ['nuscenes']:
+        dataset_cfg.VERSION = args.version
 
     # to load class names
     cfg = EasyDict(yaml.safe_load(open(args.model_cfg)))
 
-    if args.dataset == 'scannet':
+    # use oss for data loading
+    if args.oss_data or (cfg.get('OSS', None) and cfg.OSS.DATA):
+        common_utils.oss_data_client = common_utils.OSSClient()
+        print(f'Ceph client initialization with root path at {cfg.DATA_CONFIG.OSS_PATH}')
+
+    if args.dataset == 'nuscenes':
+        dataset = NuScenesDataset(
+            dataset_cfg=dataset_cfg, class_names=cfg.CLASS_NAMES,
+            root_path=ROOT_DIR / 'data' / 'nuscenes',
+            training=True, logger=common_utils.create_logger()
+        )
+    elif args.dataset == 'scannet':
         dataset = ScanNetDataset(
             dataset_cfg=dataset_cfg, class_names=cfg.CLASS_NAMES,
             root_path=ROOT_DIR / 'data' / 'scannetv2',
             training=True, logger=common_utils.create_logger()
         )
-    elif args.dataset == 's3dis':
-        # TODO: to support S3DIS generate caption correponding index
-        raise NotImplementedError
-    else:
-        raise NotImplementedError
+    elif args.dataset == 'kitti':
+        dataset = KittiDataset(
+            dataset_cfg=dataset_cfg, class_names=cfg.CLASS_NAMES,
+            root_path=ROOT_DIR / 'data' / 'kitti',
+            training=True, logger=common_utils.create_logger()
+        )
 
     processor = CaptionIdxProcessor(dataset)
     if args.func == 'create_view_caption_idx':
         """
-        python -m tools.process_tools.generate_caption_idx --dataset scannet --func create_view_caption_idx \
-        --cfg_file tools/cfgs/dataset_configs/scannet_dataset_image.yaml \
-        --model_cfg tools/cfgs/scannet_models/spconv_clip_adamw.yaml
+        python -m tools.process_tools.generate_caption_idx --dataset nuscenes --func create_view_caption_idx \
+        --cfg_file tools/cfgs/dataset_configs/nuscenes_dataset_multimodal.yaml \
+        --model_cfg tools/cfgs/nuscenes_models/sparseunet_debug_image.yaml \
+        --version v1.0-mini
         """
         processor.create_caption_idx(args.workers)
-    elif args.func == 'create_entity_caption_idx':
+    elif args.func == 'create_caption_idx_detic_crop':
         """
-        python -m tools.process_tools.generate_entity_caption_idx --dataset scannet --func create_view_caption_idx \
-        --cfg_file tools/cfgs/dataset_configs/scannet_dataset_image.yaml \
-        --model_cfg tools/cfgs/scannet_models/spconv_clip_adamw.yaml \
-        --view_caption_path ./data/scannetv2/text_embed/caption_view_scannet_vit-gpt2-image-captioning_25k.json \
-        --view_caption_corr_idx_path ./data/scannetv2/scannetv2_view_vit-gpt2_matching_idx.pickle
+        python -m tools.process_tools.generate_caption_idx --dataset nuscenes --func create_caption_idx_detic_crop \
+        --cfg_file tools/cfgs/dataset_configs/nuscenes_dataset_multimodal.yaml \
+        --model_cfg tools/cfgs/nuscenes_models/sparseunet_debug_image.yaml --version v1.0-mini --workers 4 \
+        --detic_info_path ../Detic/nuscenes_v1.0-mini_detic_pred_results.pkl \
+        --save_path data/nuscenes/v1.0-mini/nuscenes_caption_idx_detic_crop.pkl
         """
-        processor.create_entity_caption_idx(args.workers)
+        processor.create_caption_idx_with_crop(
+            args.save_path, args.detic_info_path, num_workers=args.workers
+        )
+    elif args.func == 'create_caption_idx_basic_crop':
+        """ nuScenes
+        python -m pcseg.datasets.nuscenes.nuscenes_caption --dataset nuscenes --func create_caption_idx_basic_crop \
+        --cfg_file tools/cfgs/dataset_configs/nuscenes_dataset_multimodal.yaml \
+        --model_cfg tools/cfgs/nuscenes_models/sparseunet_debug_image.yaml --version v1.0-mini \
+        --workers 16 --save_path data/nuscenes/v1.0-mini/nuscenes_caption_idx_basic_crop.pkl
+        """
+        """ ScanNet
+        python -m tools.process_tools.generate_caption_idx --func create_caption_idx_basic_crop \
+        --dataset scannet    --cfg_file tools/cfgs/dataset_configs/scannet_dataset_multimodal.yaml \
+        --model_cfg tools/cfgs/scannet_models/spconv_clip_image.yaml  --workers 16 \
+        --save_path data/scannetv2/scannet_caption_idx_basic_crop.pkl
+        """
+        processor.create_caption_idx_with_crop(
+            args.save_path, window_size=args.window_size, overlap_ratio=args.overlap_ratio, num_workers=args.workers
+        )
+    elif args.func == 'create_caption_idx_detic_crop_caption':
+        """
+        python -m tools.process_tools.generate_caption_idx --dataset nuscenes \
+        --func create_caption_idx_detic_crop_caption \
+        --cfg_file tools/cfgs/dataset_configs/nuscenes_dataset_multimodal.yaml \
+        --model_cfg tools/cfgs/nuscenes_models/sparseunet_debug_image.yaml --version v1.0-mini --workers 16 \
+        --detic_info_path ../Detic/nuscenes_v1.0-mini_detic_pred_results.pkl  \
+        --save_path data/nuscenes/v1.0-mini/nuscenes_caption_idx_detic_crop_cap.pkl \
+        --filter_by_image_size --min_image_crop_area 3600
+        ############################
+        #  with enlarge box crop ###
+        ############################
+        python -m pcseg.datasets.nuscenes.nuscenes_caption --func create_nuscenes_caption_idx_detic_crop_caption \
+        --cfg_file tools/cfgs/dataset_configs/nuscenes_dataset_multimodal.yaml \
+        --model_cfg tools/cfgs/nuscenes_models/sparseunet_debug_image.yaml --version v1.0-mini --workers 16 \
+        --detic_info_path ../Detic/nuscenes_v1.0-mini_detic_pred_results.pkl  \
+        --save_path data/nuscenes/v1.0-mini/nuscenes_caption_idx_detic_crop_cap_enlarge2.5.pkl \
+        --filter_by_image_size --min_image_crop_area 3000 --enlarge_box_ratio 2.5
+        """
+        processor.create_caption_idx_with_crop(
+            args.save_path, args.detic_info_path, num_workers=args.workers
+        )
     else:
         raise NotImplementedError

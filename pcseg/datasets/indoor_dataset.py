@@ -3,14 +3,16 @@ import pickle
 import copy
 import numpy as np
 
+from pcseg.utils.common_utils import check_exists
+
 from .dataset import DatasetTemplate
 from .augmentor.data_augmentor import DataAugmentor
 from .processor.data_processor import DataProcessor
 
 
 class IndoorDataset(DatasetTemplate):
-    def __init__(self, dataset_cfg=None, class_names=None, training=True, root_path=None, logger=None):
-        super(IndoorDataset, self).__init__(dataset_cfg, class_names, training, root_path, logger=logger)
+    def __init__(self, dataset_cfg=None, class_names=None, training=True, root_path=None, logger=None, split=None):
+        super(IndoorDataset, self).__init__(dataset_cfg, class_names, training, root_path, logger=logger, split=split)
 
         self.repeat = dataset_cfg.DATA_PROCESSOR.repeat
         self.voxel_scale = dataset_cfg.DATA_PROCESSOR.voxel_scale
@@ -27,6 +29,7 @@ class IndoorDataset(DatasetTemplate):
             **{
                 'ignore_label': self.ignore_label,
                 'voxel_scale': self.voxel_scale,
+                'voxel_down': dataset_cfg.DATA_PROCESSOR.get('voxel_down', 1),
                 'full_scale': self.full_scale,
                 'max_npoint': self.max_npoint,
             }
@@ -115,12 +118,14 @@ class IndoorDataset(DatasetTemplate):
         return subsample_idx
 
     # instance seg
-    def get_valid_inst_label(self, inst_label, valid_mask):
-        inst_label[~valid_mask] = self.ignore_label
+    def get_valid_inst_label(self, inst_label, valid_mask=None):
+        if valid_mask is not None:
+            inst_label[~valid_mask] = self.ignore_label
         label_set = np.unique(inst_label[inst_label >= 0])
-        remapper = np.full((1000,), self.ignore_label)
-        remapper[label_set.astype(np.int64)] = np.arange(len(label_set))
-        inst_label[inst_label >= 0] = remapper[inst_label[inst_label >= 0].astype(np.int64)]
+        if len(label_set) > 0:
+            remapper = np.full((int(label_set.max()) + 1,), self.ignore_label)
+            remapper[label_set.astype(np.int64)] = np.arange(len(label_set))
+            inst_label[inst_label >= 0] = remapper[inst_label[inst_label >= 0].astype(np.int64)]
         # inst_label[~valid_mask] = self.ignore_label
         # j = 0
         # while (j < inst_label.max()):
@@ -157,33 +162,8 @@ class IndoorDataset(DatasetTemplate):
             cls_idx = inst_idx_i[0][0]
             inst_cls.append(semantic_label[cls_idx])
         pt_offset_label = inst_info[:, 0:3] - xyz
-        return {'inst_num': inst_num, 'inst_info': inst_info, 'inst_pointnum': inst_pointnum, \
-                'inst_cls': inst_cls, 'pt_offset_label': pt_offset_label}
-
-    # caption func
-    def include_caption_infos(self):
-        """
-        scene_image_corr_dict = {
-            scene_name : {
-                image_name: np.array [pts_index, ...] for the given image in the scene
-            }
-        }
-        """
-        if self.caption_cfg.get('VIEW', None) and self.caption_cfg.VIEW.ENABLED:
-            scene_image_corr_infos = pickle.load(
-                open(self.root_path / self.caption_cfg.VIEW.IMAGE_CORR_PATH, 'rb')
-            )
-        else:
-            scene_image_corr_infos = None
-
-        if self.caption_cfg.get('ENTITY', None) and self.caption_cfg.ENTITY.ENABLED:
-            scene_image_corr_entity_infos = pickle.load(
-                open(self.root_path / self.caption_cfg.ENTITY.IMAGE_CORR_PATH, 'rb')
-            )
-        else:
-            scene_image_corr_entity_infos = None
-
-        return scene_image_corr_infos, scene_image_corr_entity_infos
+        return {'inst_num': inst_num, 'inst_pointnum': inst_pointnum, \
+            'inst_cls': inst_cls, 'pt_offset_label': pt_offset_label}
 
     def get_caption_image_corr_and_name_from_memory(self, scene_name, index):
         image_name_dict = {}
@@ -196,7 +176,7 @@ class IndoorDataset(DatasetTemplate):
         if hasattr(self, 'scene_image_corr_infos') and self.scene_image_corr_infos is not None:
             if isinstance(self.scene_image_corr_infos, dict):
                 # assert scene_name in self.scene_image_corr_infos
-                info = self.scene_image_corr_infos.get(scene_name, {})
+                info = copy.deepcopy(self.scene_image_corr_infos.get(scene_name, {}))
             else:
                 cur_caption_idx = copy.deepcopy(self.scene_image_corr_infos[index])
                 assert scene_name == cur_caption_idx['scene_name']
@@ -211,7 +191,7 @@ class IndoorDataset(DatasetTemplate):
         if hasattr(self, 'scene_image_corr_entity_infos') and self.scene_image_corr_entity_infos is not None:
             if isinstance(self.scene_image_corr_entity_infos, dict):
                 # assert scene_name in self.scene_image_corr_entity_infos
-                info = self.scene_image_corr_entity_infos.get(scene_name, {})
+                info = copy.deepcopy(self.scene_image_corr_entity_infos.get(scene_name, {}))
             else:
                 cur_caption_idx = copy.deepcopy(self.scene_image_corr_entity_infos[index])
                 assert scene_name == cur_caption_idx['scene_name']
@@ -234,9 +214,12 @@ class IndoorDataset(DatasetTemplate):
             image_corr_dict['scene'] = None
 
         if self.caption_cfg.get('VIEW', None) and self.caption_cfg.VIEW.ENABLED:
-            path = self.root_path / self.caption_cfg.VIEW.IMAGE_CORR_PATH / (scene_name + '.pickle')
-            if os.path.exists(path):
-                info = pickle.load(open(path, 'rb'))
+            if self.oss_client:
+                path = os.path.join(self.oss_root_path, self.caption_cfg.VIEW.IMAGE_CORR_PATH, scene_name + '.pickle')
+            else:
+                path = self.root_path / self.caption_cfg.VIEW.IMAGE_CORR_PATH / (scene_name + '.pickle')
+            if check_exists(path):
+                info = pickle.load(self.oss_client.get(path)) if self.oss_client else pickle.load(open(path, 'rb'))
             else:
                 info = {}
             if len(info) > 0:
@@ -247,9 +230,12 @@ class IndoorDataset(DatasetTemplate):
             image_corr_dict['view'] = image_corr_view
 
         if self.caption_cfg.get('ENTITY', None) and self.caption_cfg.ENTITY.ENABLED:
-            path = self.root_path / self.caption_cfg.ENTITY.IMAGE_CORR_PATH / (scene_name + '.pickle')
-            if os.path.exists(path):
-                info = pickle.load(open(path, 'rb'))
+            if self.oss_client:
+                path = os.path.join(self.oss_root_path, self.caption_cfg.ENTITY.IMAGE_CORR_PATH, scene_name + '.pickle')
+            else:
+                path = self.root_path / self.caption_cfg.ENTITY.IMAGE_CORR_PATH / (scene_name + '.pickle')
+            if check_exists(path):
+                info = pickle.load(self.oss_client.get(path)) if self.oss_client else pickle.load(open(path, 'rb'))
             else:
                 info = {}
             if len(info) > 0:

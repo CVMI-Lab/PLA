@@ -1,0 +1,16 @@
+_BASE_CONFIG_: cfgs/kitti_models/panoptic/softgroup_clip_base4_caption.yaml
+
+MODEL:
+  INST_HEAD:
+    CLUSTERING:
+      PSEUDO_OFFSET_CFG:
+        MIN_SV: 2
+        CLUSTER_THR: 5.0
+
+OFFSET_ST:
+  PSEUDO_LABEL_EPOCHS: [20, 32, 44, 56]
+  PSEUDO_LABEL_DIR: pseudo_offset
+  GLOBAL_THRES: True
+  THRES: 0.
+  KEEP_PSEUDO_LABEL: False
+  GT_OFFSET: False

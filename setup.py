@@ -28,7 +28,7 @@ def write_version_to_file(version, target_file):
 
 
 if __name__ == '__main__':
-    version = '0.1.0+%s' % get_git_commit_number()
+    version = '0.2.0+%s' % get_git_commit_number()
     write_version_to_file(version, 'pcseg/version.py')
 
     setup(
@@ -52,5 +52,14 @@ if __name__ == '__main__':
         cmdclass={
             'build_ext': BuildExtension,
         },
-        ext_modules=[],
+        ext_modules=[
+            make_cuda_ext(
+                name='pool_by_idx',
+                module='pcseg.ops.pool_by_idx',
+                sources=[
+                    'src/avg_pool_by_idx.cpp',
+                    'src/avg_pool_by_idx_kernel.cu',
+                ]
+            ),
+        ],
     )

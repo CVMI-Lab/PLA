@@ -102,19 +102,16 @@ def get_coor_colors(obj_labels):
     Returns:
         rgb: [N, 3]. color for each point.
     """
-    colors = matplotlib.colors.XKCD_COLORS.values()
     max_color_num = obj_labels.max()
+    colors_rgb = [np.array(np.random.random((1, 3)).tolist()[0]) for _ in range(max_color_num + 1)]
+    label_rgb = np.array(colors_rgb)[obj_labels]
 
-    color_list = list(colors)[:max_color_num+1]
-    colors_rgba = [matplotlib.colors.to_rgba_array(color) for color in color_list]
-    label_rgba = np.array(colors_rgba)[obj_labels]
-    label_rgba = label_rgba.squeeze()[:, :3]
-
-    return label_rgba
+    return label_rgb
 
 
 def draw_scenes(points, gt_boxes=None, ref_boxes=None, ref_labels=None, ref_scores=None,
-                point_colors=None, draw_origin=True, point_size=1.0):
+                preds=None, point_colors=None, draw_origin=True, point_size=1.0, 
+                default_color=[0.44, 0.514, 0.655], color_map=None):
     if isinstance(points, torch.Tensor):
         points = points.cpu().numpy()
     if isinstance(gt_boxes, torch.Tensor):
@@ -137,15 +134,18 @@ def draw_scenes(points, gt_boxes=None, ref_boxes=None, ref_labels=None, ref_scor
     pts = open3d.geometry.PointCloud()
     pts.points = open3d.utility.Vector3dVector(points[:, :3])
 
-    vis.add_geometry(pts)
-    if point_colors is None:
-        color = np.array([0.44, 0.514, 0.655])
-        pts.colors = open3d.utility.Vector3dVector(np.repeat(color[None, :], points.shape[0], axis=0))
-    else:
+    if point_colors is not None:
         # normalize color to [0, 1]
         point_colors = (point_colors - point_colors.min()) / (point_colors.max() - point_colors.min())
         pts.colors = open3d.utility.Vector3dVector(point_colors)
-
+    elif color_map is not None:
+        point_colors = get_point_colors_with_color_map_and_preds(preds, color_map, default_color)
+        pts.colors = open3d.utility.Vector3dVector(point_colors)
+    else:
+        color = np.array(default_color)
+        pts.colors = open3d.utility.Vector3dVector(np.repeat(color[None, :], points.shape[0], axis=0))
+    
+    vis.add_geometry(pts)
     if gt_boxes is not None:
         vis = draw_box(vis, gt_boxes, (0, 0, 1))
 
@@ -154,6 +154,25 @@ def draw_scenes(points, gt_boxes=None, ref_boxes=None, ref_labels=None, ref_scor
 
     vis.run()
     vis.destroy_window()
+
+def get_point_colors_with_color_map_and_preds(preds, color_map, default_color=[0.44, 0.514, 0.655]):
+    # import ipdb; ipdb.set_trace(context=20)
+    point_colors = np.array(default_color, dtype=np.float32)[None, :].repeat(preds.shape[0], 0)
+    for label, color in color_map.items():
+        point_mask = preds == label
+        point_colors[point_mask] = np.array(color) / 255.0
+
+    return point_colors
+
+
+def get_point_colors_with_color_map_and_preds(preds, color_map, default_color=[0.44, 0.514, 0.655]):
+    # import ipdb; ipdb.set_trace(context=20)
+    point_colors = np.array(default_color, dtype=np.float32)[None, :].repeat(preds.shape[0], 0)
+    for label, color in color_map.items():
+        point_mask = preds == label
+        point_colors[point_mask] = np.array(color) / 255.0
+
+    return point_colors
 
 
 def draw_scenes_v2(points, gt_boxes=None, ref_boxes=None, ref_labels=None, ref_scores=None,
@@ -296,4 +315,3 @@ if __name__ == '__main__':
         vis_dict = pickle.load(f)
 
     draw_scenes(**vis_dict)
-

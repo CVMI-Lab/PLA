@@ -40,6 +40,13 @@ def parse_config():
     parser.add_argument('--ckpt_dir', type=str, default=None, help='specify a ckpt directory to be evaluated if needed')
     parser.add_argument('--save_results', default=[], nargs='+', type=str, help='coords, offset, semantic, instance')
     parser.add_argument('--infer_time', action='store_true', default=False, help='calculate inference latency')
+    parser.add_argument('--oss_data', action='store_true', default=False, help='')
+    
+    parser.add_argument('--count_point_caption_num', action='store_true', default=False,
+                        help='calculate the number of caption for each point')
+
+    parser.add_argument('--count_caption_ratio_only', action='store_true', default=False,
+                        help='calculate the number of caption for each point')
 
     args = parser.parse_args()
 
@@ -55,7 +62,8 @@ def parse_config():
     return args, cfg
 
 
-def eval_single_ckpt(model, test_loader, args, text_encoder, text_embed, logger, epoch_id, dist_test=False, eval_output_dir=None):
+@torch.no_grad()
+def eval_single_ckpt(model, test_loader, args, text_embed, logger, epoch_id, dist_test=False, eval_output_dir=None):
     # load checkpoint
     if args.ckpt:
         epoch_id = model.load_params_from_file(filename=args.ckpt, logger=logger, epoch_id=epoch_id, to_cpu=dist_test)
@@ -199,41 +207,38 @@ def main():
     ckpt_dir = args.ckpt_dir if args.ckpt_dir is not None else output_dir / 'ckpt'
 
     # use oss for data loading
-    if cfg.get('OSS', None) and cfg.OSS.DATA:
+    if args.oss_data or (cfg.get('OSS', None) and cfg.OSS.DATA):
         common_utils.oss_data_client = common_utils.OSSClient()
         logger.info(f'Ceph client initialization with root path at {cfg.DATA_CONFIG.OSS_PATH}')
 
-    if cfg.get('TEXT_ENCODER', None) and cfg.TEXT_ENCODER.EXTRACT_EMBED:
-        class_names = cfg.TEXT_ENCODER.CATEGORY_NAMES
-    else:
-        class_names = cfg.CLASS_NAMES
     test_set, test_loader, sampler = build_dataloader(
         dataset_cfg=cfg.DATA_CONFIG,
-        class_names=class_names,
+        class_names=cfg.CLASS_NAMES,
         batch_size=args.batch_size,
         dist=dist_test, workers=args.workers, logger=logger, training=False
     )
+
+    if getattr(args, 'count_point_caption_num', False) or getattr(args, 'count_caption_ratio_only', False):
+        test_set.need_n_captions_points = True
 
     if cfg.get('TEXT_ENCODER', None) or cfg.MODEL.TASK_HEAD.get('TEXT_EMBED', None):
         text_encoder = build_text_network(cfg.TEXT_ENCODER).cuda()
         if cfg.get('TEXT_ENCODER', None) and cfg.TEXT_ENCODER.EXTRACT_EMBED:
             text_embed = load_text_embedding_from_encoder(cfg.TEXT_ENCODER, text_encoder, logger)
         else:
-            text_embed = load_text_embedding_from_path(cfg.MODEL.TASK_HEAD.TEXT_EMBED)
+            text_embed = load_text_embedding_from_path(cfg.MODEL.TASK_HEAD.TEXT_EMBED, logger)
         cfg.MODEL.TASK_HEAD.TEXT_EMBED.CHANNEL = text_embed.shape[1]
         cfg.MODEL.TASK_HEAD.TEXT_EMBED.NUM_CLASS = text_embed.shape[0]
         if cfg.MODEL.get('ADAPTER', False):
             cfg.MODEL.ADAPTER.TEXT_DIM = text_embed.shape[1]
     else:
         text_embed = None
-        text_encoder = None
 
     model = build_vision_network(model_cfg=cfg.MODEL, num_class=len(cfg.CLASS_NAMES), dataset=test_set)
 
-    with torch.no_grad():
-        eval_single_ckpt(
-            model, test_loader, args, text_encoder, text_embed, logger, epoch_id, dist_test=dist_test,
-            eval_output_dir=eval_output_dir)
+    eval_single_ckpt(
+        model, test_loader, args, text_embed, logger, epoch_id, dist_test=dist_test,
+        eval_output_dir=eval_output_dir)
 
 
 if __name__ == '__main__':

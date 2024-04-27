@@ -11,26 +11,24 @@ DATA_CONFIG:
     KEY: [SCENE, VIEW, ENTITY]
     SCENE:
       ENABLED: False
-      CAPTION_PATH: text_embed/caption_scene_s3dis_vit-gpt2-image-captioning_max50.json
-      GATHER_CAPTION: True
+      CAPTION_PATH: text_embed/caption.json
+    IMAGE_CORR_PATH: s3dis_matching_idx_5
 
     VIEW:
       ENABLED: True
-      CAPTION_PATH: text_embed/caption_view_s3dis_vit-gpt2-image-captioning_max50.json
-      IMAGE_CORR_PATH: caption_idx/s3dis_view_vit-gpt2_matching_idx
+      CAPTION_PATH: text_embed/caption_2d.json
+      IMAGE_CORR_PATH: s3dis_matching_idx_5
       SELECT: ratio
       NUM: 1
       RATIO: 0.2
-      GATHER_CAPTION: True
 
     ENTITY:
       ENABLED: True
-      CAPTION_PATH: text_embed/caption_entity_s3dis_vit-gpt2-image-captioning_max50.json
-      IMAGE_CORR_PATH: caption_idx/s3dis_entity_vit-gpt2_matching_idx
+      CAPTION_PATH: text_embed/caption_2d_intersect_v3.json
+      IMAGE_CORR_PATH: s3dis_matching_idx_5_intersect_v3
       SELECT: ratio
       NUM: 1
       RATIO: 1.0
-      GATHER_CAPTION: True
   
     CAPTION_CORR_PATH_IN_ONE_FILE: False
 
@@ -63,4 +61,4 @@ MODEL:
       ENTITY: 0.02
 
   INST_HEAD:
-    CORRECT_SEG_PRED_BINARY: Tru
+    CORRECT_SEG_PRED_BINARY: True

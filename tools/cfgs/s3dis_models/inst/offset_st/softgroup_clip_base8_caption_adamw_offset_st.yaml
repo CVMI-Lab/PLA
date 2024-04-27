@@ -1,0 +1,24 @@
+_BASE_CONFIG_: cfgs/s3dis_models/inst/softgroup_clip_base8_caption_adamw.yaml
+
+DATA_CONFIG:
+  # _BASE_CONFIG_: cfgs/dataset_configs/s3dis_dataset_sv.yaml
+  # DATASET: S3DISInstDataset
+  base_class_idx: [ 0, 1, 2, 3, 4, 6, 8, 11 ]
+  novel_class_idx: [ 5, 7, 9, 10 ]
+  ignore_class_idx: [ 12 ]
+
+MODEL:
+  INST_HEAD:
+    CLUSTERING:
+      PSEUDO_OFFSET_CFG:
+        MIN_SV: 2
+        CLUSTER_THR: 5.0
+
+OFFSET_ST:
+  PSEUDO_LABEL_EPOCHS: [20, 31, 42, 53]
+  PSEUDO_LABEL_DIR: pseudo_offset
+  GLOBAL_THRES: True
+  THRES: 0.
+  KEEP_PSEUDO_LABEL: False
+  MAX_POINT: 8000000
+  GT_OFFSET: False

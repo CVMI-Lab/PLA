@@ -1,0 +1,21 @@
+_BASE_CONFIG_: cfgs/nuscenes_models/ov/sparseunet_clip_base10_caption_new-category-name.yaml
+
+DATA_CONFIG:
+  CAPTION_INFO:
+    VIEW:
+      CAPTION_PATH: text_embed/caption_crop_nuscenes_v1.0-trainval_vit-gpt2-image-captioning_detic_raw_pred.json
+      IMAGE_CORR_PATH: nuscenes_caption_idx_detic_crop.pkl
+
+MODEL:
+  CAPTION_HEAD:
+    CUDA_ENABLED: True
+
+TEXT_ENCODER:
+  CATEGORY_NAMES: [ 'barrier or fence', 'bicycle or bike or cycle', 'bus', 'car',
+                    'construction vehicle or bulldozer or excavator or concrete mixer or crane or dump truck’',
+                    'motorcycle or motorbike',
+                    'pedestrian or people or man or woman',
+                    'traffic cone', 'trailer', 'truck', 'road or street', 'other flat', 'sidewalk',
+                    'grass or rolling hills or soil or gravel',
+                    'building or wall or fence or pole or sign or traffic light',
+                    'bushes or plants or trees or potted plants' ]

@@ -89,10 +89,7 @@ class BinaryHead(nn.Module):
 
         # filter unannotated categories
         mask = binary_labels != self.ignore_label
-        binary_scores = binary_scores[mask] 
-        binary_labels = binary_labels[mask]
-
-        binary_loss = self.binary_loss_func(binary_scores, binary_labels.reshape(-1, 1))
+        binary_loss = self.binary_loss_func(binary_scores[mask], binary_labels[mask].reshape(-1, 1))
         binary_loss = binary_loss * self.model_cfg.get('LOSS_WEIGHT', 1.0)
 
         tb_dict = {'binary_loss': binary_loss.item()}

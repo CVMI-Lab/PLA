@@ -14,7 +14,5 @@ do
 done
 echo $PORT
 
-ulimit -n 64000
-
 python3 -m torch.distributed.launch --nproc_per_node=${NGPUS} train.py --launcher pytorch --tcp_port ${PORT} ${PY_ARGS}
 

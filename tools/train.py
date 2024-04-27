@@ -4,6 +4,7 @@ import datetime
 import glob
 import os
 from pathlib import Path
+import subprocess
 
 import torch
 import torch.nn as nn
@@ -17,10 +18,10 @@ from pcseg.models.model_utils import load_best_metric
 from pcseg.utils import common_utils, caption_utils, commu_utils
 from train_utils.optimization import build_optimizer, build_scheduler
 from train_utils.train_utils import train_model
-from pcseg.utils import arnold_utils
 
 import warnings
 warnings.filterwarnings("ignore")
+
 
 def parse_config():
     parser = argparse.ArgumentParser(description='arg parser')
@@ -52,12 +53,14 @@ def parse_config():
     parser.add_argument('--eval_freq', type=int, default=10, help='evaluation frequency during training')
     parser.add_argument('--validate_start', action='store_true', default=False, help='evaluation at the begining')
     parser.add_argument('--use_amp', action='store_true', default=False, help='')
-    parser.add_argument('--arnold_enabled', action='store_true', default=False, help='enable arnold')
-    parser.add_argument('--arnold_dir', default='output_pcseg', help='arnold output path')
     parser.add_argument('--multi_epoch_loader', action='store_true', default=False, help='')
     parser.add_argument('--find_unused_parameters', action='store_true', default=False, help='')
+    parser.add_argument('--no_fix_random_seed', action='store_true', default=False, help='')
+    parser.add_argument('--oss_data', action='store_true', default=False, help='')
 
     parser.add_argument('--occupy', action='store_true', default=False, help='')
+    
+    parser.add_argument('--clean_shm', action='store_true', default=False, help='clean shm memory')
 
     args = parser.parse_args()
 
@@ -99,7 +102,7 @@ def main():
     if args.occupy:
         args.epochs = 100000
 
-    if args.fix_random_seed:
+    if not args.no_fix_random_seed:
         common_utils.set_random_seed(666 + cfg.LOCAL_RANK)
 
     output_dir = cfg.ROOT_DIR / 'output' / cfg.EXP_GROUP_PATH / cfg.TAG / args.extra_tag
@@ -126,7 +129,7 @@ def main():
     tb_log = SummaryWriter(log_dir=str(output_dir / 'tensorboard')) if cfg.LOCAL_RANK == 0 else None
 
     # use oss for data loading
-    if cfg.get('OSS', None) and cfg.OSS.DATA:
+    if args.oss_data or (cfg.get('OSS', None) and cfg.OSS.DATA):
         common_utils.oss_data_client = common_utils.OSSClient()
         logger.info(f'Ceph client initialization with root path at {cfg.DATA_CONFIG.OSS_PATH}')
 
@@ -136,6 +139,14 @@ def main():
     # else:
     #     caption_items = None
 
+    if args.clean_shm and cfg.LOCAL_RANK == 0:
+        logger.info(">>> clean shm memory....")
+        os.system("rm /dev/shm/scannet_* -f")
+        os.system("rm /dev/shm/Area_* -f")
+        logger.info(">>> clean shm memory done")
+        
+    commu_utils.synchronize()
+    
     # -----------------------create dataloader & network & optimizer---------------------------
     train_set, train_loader, train_sampler = build_dataloader(
         dataset_cfg=cfg.DATA_CONFIG,
@@ -157,12 +168,24 @@ def main():
         dist=dist_train, workers=args.workers, logger=logger, training=False
     )
 
+    if cfg.get('OFFSET_ST'):
+        # different batch size, repeat != 1, x4_split cause we cannot use original train set here.
+        pseudo_train_set, pseudo_train_loader, _ = build_dataloader(
+            dataset_cfg=cfg.DATA_CONFIG,
+            class_names=cfg.CLASS_NAMES,
+            batch_size=args.test_batch_size,
+            dist=dist_train, workers=args.workers, logger=logger,
+            training=False, split='train'
+        )
+    else:
+        pseudo_train_loader = None
+
     if cfg.get('TEXT_ENCODER', None) or cfg.MODEL.TASK_HEAD.get('TEXT_EMBED', None):
         text_encoder = build_text_network(cfg.TEXT_ENCODER).cuda()
         if cfg.get('TEXT_ENCODER', None) and cfg.TEXT_ENCODER.EXTRACT_EMBED:
             text_embed = load_text_embedding_from_encoder(cfg.TEXT_ENCODER, text_encoder, logger)
         else:
-            text_embed = load_text_embedding_from_path(cfg.MODEL.TASK_HEAD.TEXT_EMBED)
+            text_embed = load_text_embedding_from_path(cfg.MODEL.TASK_HEAD.TEXT_EMBED, logger)
         cfg.MODEL.TASK_HEAD.TEXT_EMBED.CHANNEL = cfg.MODEL.ADAPTER.TEXT_DIM = text_embed.shape[1]
         cfg.MODEL.TASK_HEAD.TEXT_EMBED.NUM_CLASS = text_embed.shape[0]
     else:
@@ -176,10 +199,6 @@ def main():
 
     optimizer = build_optimizer(model, cfg.OPTIMIZATION)
 
-    # initialize arnold
-    arnold = arnold_utils.ArnoldUtils(enabled=args.arnold_enabled, arnold_dir=args.arnold_dir, logger=logger) 
-    if cfg.LOCAL_RANK == 0:
-        arnold.load_ckpt(str(ckpt_dir))
     commu_utils.synchronize()
 
     # load checkpoint if it is possible
@@ -249,7 +268,7 @@ def main():
         dist_train=dist_train,
         # caption_items=caption_items,
         text_encoder=text_encoder,
-        arnold=arnold
+        pseudo_train_loader=pseudo_train_loader
     )
 
 

@@ -17,7 +17,6 @@ class SparseUNetTextSeg(ModelTemplate):
         ret_dict = self.task_head.forward_ret_dict
         if self.training:
             loss, tb_dict, disp_dict = self.get_training_loss()
-
             ret_dict['loss'] = loss
             return ret_dict, tb_dict, disp_dict
         else:
@@ -57,7 +56,14 @@ class SparseUNetTextSeg(ModelTemplate):
         else:
             inst_loss = 0
 
-        loss = seg_loss + binary_loss + caption_loss + inst_loss
+        # for distillation loss
+        if self.kd_head is not None:
+            kd_loss, tb_dict_kd = self.kd_head.get_loss()
+            tb_dict.update(tb_dict_kd)
+        else:
+            kd_loss = 0
+
+        loss = seg_loss + binary_loss + caption_loss + inst_loss + kd_loss
         tb_dict['loss'] = loss.item()
         disp_dict.update(tb_dict)
 

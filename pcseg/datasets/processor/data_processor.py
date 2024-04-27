@@ -130,6 +130,7 @@ class DataProcessor(object):
         coord = data_dict['points'][:, :3]
         labels = data_dict['labels']
         binary_labels = data_dict['binary_labels']
+        inst_label = data_dict.get('inst_label', None)
         xyz_norm = config['xyz_norm']
 
         # voxelization process
@@ -143,6 +144,8 @@ class DataProcessor(object):
         if config.get('voxel_label', False):
             labels = labels[uniq_idx]
             binary_labels = binary_labels[uniq_idx]
+            if inst_label is not None:
+                inst_label = inst_label[uniq_idx]
 
         if xyz_norm:
             coord_min = np.min(coord, 0)
@@ -157,6 +160,8 @@ class DataProcessor(object):
         data_dict['labels'] = labels
         data_dict['v2p_map'] = idx_recon
         data_dict['binary_labels'] = binary_labels
+        if inst_label is not None:
+            data_dict['inst_label'] = inst_label
 
         data_dict.pop('points_xyz_voxel_scale', None)
         data_dict.pop('feats', None)
@@ -171,6 +176,7 @@ class DataProcessor(object):
         coord = data_dict['points'][:, :3]
         labels = data_dict['labels']
         binary_labels = data_dict['binary_labels']
+        inst_label = data_dict.get('inst_label', None)
         xyz_norm = config['xyz_norm']
 
         # voxelization process
@@ -196,12 +202,17 @@ class DataProcessor(object):
         if self.training and config.get('voxel_label', False):
             labels = labels[uniq_idx]
             binary_labels = binary_labels[uniq_idx]
+            if inst_label is not None:
+                inst_label = inst_label[uniq_idx]
 
         data_dict['voxel_coords'] = coord_norm
         # data_dict['xyz'] = coord
         data_dict['voxel_features'] = feats
         data_dict['labels'] = labels
         data_dict['binary_labels'] = binary_labels
+        if inst_label is not None:
+            data_dict['inst_label'] = inst_label
+
         data_dict['v2p_map'] = idx_recon
 
         data_dict.pop('points_xyz_voxel_scale', None)

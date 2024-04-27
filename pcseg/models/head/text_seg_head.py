@@ -6,12 +6,13 @@ import numpy as np
 from collections import OrderedDict
 
 from ..text_networks import load_text_embedding_from_path
+from pcseg.utils import category_remap_utils
 from pcseg.config import cfg
 from pcseg.utils import common_utils
 
 
 class TextSegHead(nn.Module):
-    def __init__(self, model_cfg, in_channel, ignore_label, valid_class_idx, **kwargs):
+    def __init__(self, model_cfg, in_channel, ignore_label, **kwargs):
         super(TextSegHead, self).__init__()
         self.model_cfg = model_cfg
         self.in_channel = in_channel
@@ -36,10 +37,14 @@ class TextSegHead(nn.Module):
             param.requires_grad = False
 
         # open vocab
-        self.valid_class_idx = valid_class_idx
+        self.valid_class_idx = [i for i in range(len(cfg.CLASS_NAMES))]
         if hasattr(cfg.DATA_CONFIG, 'base_class_idx'):
             self.base_class_idx = cfg.DATA_CONFIG.base_class_idx
             self.novel_class_idx = cfg.DATA_CONFIG.novel_class_idx
+        if hasattr(cfg.DATA_CONFIG, 'ignore_class_idx'):
+            self.ignore_class_idx = cfg.DATA_CONFIG.ignore_class_idx
+            for i in self.ignore_class_idx:
+                self.valid_class_idx.remove(i)
 
         # remap category name for ambigous categories
         self.need_class_mapping = self.model_cfg.get('CLASS_MAPPING', False)
@@ -48,7 +53,15 @@ class TextSegHead(nn.Module):
                 self.model_cfg.CLASS_MAPPING, cfg.TEXT_ENCODER.CATEGORY_NAMES, cfg.CLASS_NAMES
             )
 
-        self.seg_loss_func = nn.CrossEntropyLoss(ignore_index=self.ignore_label).cuda()
+        self.seg_loss_weight = model_cfg.get('SEMANTIC_WEIGHT', None)
+        if self.seg_loss_weight is not None:
+            self.seg_loss_weight = torch.FloatTensor(self.seg_loss_weight).cuda()
+            if hasattr(cfg.DATA_CONFIG, 'base_class_idx'):
+                self.seg_loss_weight = self.seg_loss_weight[self.base_class_idx]
+            else:
+                self.seg_loss_weight = self.seg_loss_weight[self.valid_class_idx]
+        self.seg_loss_func = nn.CrossEntropyLoss(
+            weight=self.seg_loss_weight, ignore_index=self.ignore_label).cuda()
         self.forward_ret_dict = {}
 
     def set_cls_head_with_text_embed(self, text_embed):
@@ -80,7 +93,7 @@ class TextSegHead(nn.Module):
         if not self.training and self.need_class_mapping:
             semantic_scores = self.remap_category(semantic_scores, self.idx_mapping)
 
-        if self.training:
+        if self.training or batch_dict.get('pseudo_label_generation', False):
             if hasattr(self, 'base_class_idx'):
                 semantic_scores = semantic_scores[..., self.base_class_idx]
             else:
@@ -93,7 +106,8 @@ class TextSegHead(nn.Module):
 
         # get semantic prediction results
         # consider the binary calibrate 
-        if not self.training and batch_dict.get('binary_ret_dict') and self.correct_seg_pred_binary:
+        if (not self.training) and (not batch_dict.get('pseudo_label_generation', False)) and \
+            batch_dict.get('binary_ret_dict') and self.correct_seg_pred_binary:
             binary_preds, semantic_preds = self.correct_seg_pred_with_binary_pred(
                 batch_dict, semantic_scores
             )
@@ -104,12 +118,14 @@ class TextSegHead(nn.Module):
             else:
                 binary_preds = None
 
+        # for 2D fusion
+        if not self.training and not batch_dict.get('pseudo_label_generation', False) and \
+            'adapter_feats_mask' in batch_dict:
+            semantic_preds[~batch_dict['adapter_feats_mask'].bool().cuda()] = self.ignore_label
+
         # for captions
         batch_dict['seg_scores'] = semantic_scores
-
-        # for 2D fusion
-        if not self.training and 'adapter_feats_mask' in batch_dict:
-            semantic_preds[~batch_dict['adapter_feats_mask'].bool().cuda()] = self.ignore_label
+        batch_dict['seg_preds'] = semantic_preds
 
         self.forward_ret_dict['seg_scores'] = semantic_scores
         self.forward_ret_dict['seg_preds'] = semantic_preds

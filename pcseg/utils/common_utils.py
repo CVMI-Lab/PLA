@@ -407,9 +407,9 @@ class OSSClient(object):
 
         # check extension type
         extension = os.path.splitext(file_path)[-1]
-        if extension in ['.txt']:
-            return file_bytes
-        elif extension in ['.pkl', '.npy']:
+        # if extension in ['.txt']:
+            # return file_bytes
+        if extension in ['.txt', '.pkl', '.npy', '.png', '.jpg', '.jpeg', '.pth', '.json', '.pickle']:
             file_bytes = io.BytesIO(file_bytes)
         else:
             file_bytes = memoryview(file_bytes)
@@ -426,3 +426,47 @@ class OSSClient(object):
 
 
 oss_data_client = None
+
+
+def save_results(result_dir, preds, offsets, ids, data_list, formats=['txt'], replace=False, xyz=False, dataset='scannet', pt_offsets=None):
+    for fmt in formats:
+        os.makedirs(os.path.join(result_dir, fmt), exist_ok=True)
+    for (i, idx) in enumerate(ids):
+        if 'txt' in formats:
+            # savetxt
+            save_path = os.path.join(result_dir, 'txt', data_list[idx].split('/')[-1].split('.')[0] + '.txt')
+            if os.path.exists(save_path) and not replace:
+                continue
+            # save semantic pseudo labels
+            if isinstance(preds, torch.FloatTensor):
+                np.savetxt(save_path, preds[offsets[i]: offsets[i + 1]])
+            else:
+                np.savetxt(save_path, preds[offsets[i]: offsets[i + 1]].astype(np.int64), fmt='%d')
+
+            # # save instance pseudo labels
+            # if pt_offsets is not None:
+            #     offsets_save_path = os.path.join(result_dir, 'txt', data_list[idx].split('/')[-1].split('.')[0] + '_offsets.txt')
+            #     np.savetxt(offsets_save_path, pt_offsets[offsets[i]: offsets[i + 1]], fmt='%f')
+
+        if 'npy' in formats:
+            save_path = os.path.join(result_dir, 'npy', data_list[idx].split('/')[-1].split('.')[0] + '.npy')
+            if os.path.exists(save_path) and not replace:
+                continue
+            np.save(save_path, preds[offsets[i]: offsets[i + 1]])
+
+        # if 'ply' in formats:
+        #     from operator import itemgetter
+        #     if dataset == 'scannet':
+        #         from util.visualize_utils import SCANNET_CLASS_COLOR as CLASS_COLOR, SCANNET_DA_SEMANTIC_NAMES as SEMANTIC_NAMES
+        #     elif dataset == 's3dis':
+        #         from util.visualize_utils import S3DIS_CLASS_COLOR as CLASS_COLOR, S3DIS_DA_SEMANTIC_NAMES as SEMANTIC_NAMES
+        #     else: raise NotImplementedError
+        #     preds[preds == 255] = 11
+        #     label_color = np.array(itemgetter(*SEMANTIC_NAMES[preds[(preds >= 0) & (preds != 255)].astype(np.int64)])
+        #                            (CLASS_COLOR))
+        #     # saveply
+        #     save_path = os.path.join(result_dir, 'ply', data_list[idx].split('/')[-1].split('.')[0] + '.ply')
+        #     pcd = o3d.geometry.PointCloud()
+        #     pcd.points = o3d.utility.Vector3dVector(xyz[(preds >= 0) & (preds != 255)][offsets[i]: offsets[i + 1]])
+        #     pcd.colors = o3d.utility.Vector3dVector(label_color[offsets[i]: offsets[i + 1]] / 255.0)
+        #     o3d.io.write_point_cloud(save_path, pcd)
