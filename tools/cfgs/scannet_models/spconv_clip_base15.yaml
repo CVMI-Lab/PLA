@@ -1,7 +1,0 @@
-_BASE_CONFIG_: cfgs/scannet_models/spconv_clip.yaml
-
-DATA_CONFIG:
-  # TODO: make base + novel = all.
-  base_class_idx: [ 0, 1, 2, 3, 4, 6, 7, 8, 10, 11, 13, 14, 15, 17, 18 ]
-  novel_class_idx: [ 5, 9, 12, 16 ]
-  ignore_class_idx: [ 19 ] # ignore category will be mapped into novel for binary classifier

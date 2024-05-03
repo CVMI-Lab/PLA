@@ -3,10 +3,14 @@ CLASS_NAMES: [wall, floor, cabinet, bed, chair, sofa, table, door, window, books
 
 DATA_CONFIG:
   _BASE_CONFIG_: cfgs/dataset_configs/scannet_dataset.yaml
-
-  base_class_idx: [ 0, 1, 2, 3, 4, 6, 7, 8, 10, 11, 13, 14, 15, 17, 18 ]
-  novel_class_idx: [ 5, 9, 12, 16 ]
+  DATASET: ScanNetInstDataset
+  inst_class_idx: [ 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 ]
+  base_class_idx: [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 13 ]
+  novel_class_idx: [ 9, 10, 11, 12, 14, 15, 16, 17, 18 ]
   ignore_class_idx: [ 19 ]
+
+  sem2ins_classes: []
+  inst_label_shift: 2
 
   CAPTION_INFO:
 
@@ -15,11 +19,12 @@ DATA_CONFIG:
     SCENE:
       ENABLED: False
       CAPTION_PATH: text_embed/caption.json
+      GATHER_CAPTION: True
 
     VIEW:
       ENABLED: True
-      CAPTION_PATH: text_embed/caption_detic-template_and_kosmos_125k_iou0.2.json
-      IMAGE_CORR_PATH: scannet_caption_idx_detic-template_and_kosmos_125k_iou0.2.pkl
+      CAPTION_PATH: text_embed/caption_kosmos_and_sw_125k_iou0.2-0.0.json
+      IMAGE_CORR_PATH: scannet_caption_idx_kosmos_and_sw_125k_iou0.2-0.0.pkl
       SELECT: ratio
       NUM: 1
       RATIO: 0.2
@@ -29,20 +34,17 @@ DATA_CONFIG:
     ENTITY:
       ENABLED: False
       CAPTION_PATH: text_embed/caption_2d_intersect_v3.json
-      IMAGE_CORR_PATH: scannetv2_matching_idx_intersect_v3
+      IMAGE_CORR_PATH: scannetv2_matching_idx_intersect_v3.pickle
       SELECT: ratio
       NUM: 1
       RATIO: 1.0
-    
+      GATHER_CAPTION: True
+
     CAPTION_CORR_PATH_IN_ONE_FILE: True
-
-  FILTER_WITH_N_CAPTIONS: -1
-
 
 MODEL:
   NAME: SparseUNetTextSeg
   REMAP_FROM_3DLANG: False
-  REMAP_FROM_NOADAPTER: False
 
   VFE:
     NAME: IndoorVFE
@@ -57,6 +59,13 @@ MODEL:
     NUM_BLOCKS: 7
     CUSTOM_SP1X1: True
 
+  ADAPTER:
+    NAME: VLAdapter
+    EVAL_ONLY: False
+    NUM_ADAPTER_LAYERS: 2
+    TEXT_DIM: -1
+    LAST_NORM: True
+
   BINARY_HEAD:
     NAME: BinaryHead
     DETACH: True
@@ -66,24 +75,22 @@ MODEL:
                         'unet.u.u.blocks.block1', 'unet.u.u.u.blocks.block1',
                         'unet.u.u.u.u.blocks.block1', 'unet.u.u.u.u.u.blocks.block1',
                         'unet.u.u.u.u.u.u.blocks.block1' ]
-  
-  ADAPTER:
-    NAME: VLAdapter
-    EVAL_ONLY: False
-    NUM_ADAPTER_LAYERS: 2
-    TEXT_DIM: -1
-    LAST_NORM: True
 
   TASK_HEAD:
     NAME: TextSegHead
     FEAT_NORM: False
     CORRECT_SEG_PRED_BINARY: True
 
+    LAST_NORM: True
     TEXT_EMBED:
       NAME: CLIP
       NORM: True
       PATH: text_embed/scannet_clip-ViT-B16_id.pth
-
+    FEAT_NORM: False
+    LOGIT_SCALE:
+      value: 1.0
+      learnable: False
+  
   CAPTION_HEAD:
     NAME: CaptionHead
     POOLING_TYPE: avg
@@ -91,18 +98,48 @@ MODEL:
     LOGIT_SCALE:
       value: 100.0
       learnable: True
-
     CUDA_ENABLED: True
-    POOL_OBJ: score # [feat, score]
-    LOSS_FUNC: NLL_NoReduce
     LOSS_WEIGHT:
       SCENE: 0.1
       VIEW: 0.5
       ENTITY: 0.1
-
-    DIV_N_CAP: False
-    DIV_MODE: none # [none, square, log2]
+    POOL_OBJ: score
+    LOSS_FUNC: NLL_NoReduce
     NOVEL_GRAD_ONLY: True
+  
+  INST_HEAD:
+    NAME: InstHead
+
+    BLOCK_RESIDUAL: True
+    CUSTOM_SP1X1: True
+    CORRECT_SEG_PRED_BINARY: True
+
+    CLUSTERING:
+      PREPARE_EPOCH: 32
+      GROUPING_CFG:
+        SCORE_THR: 0.2
+        RADIUS: 0.04
+        MEAN_ACTIVE: 300
+        CLASS_NUMPOINT_MEAN: [-1., -1., -1., -1., -1., -1., -1., -1., -1., -1.,
+                              -1., -1., -1., -1., -1., -1., -1., -1., -1., -1.]
+        NPOINT_THR: 50  # absolute if class_numpoint == -1, relative if class_numpoint != -1
+        IGNORE_CLASSES: [0, 1]
+      INST_VOXEL_CFG:
+        SCALE: 50
+        SPATIAL_SHAPE: 20
+      LOSS_CFG:
+        MAX_PROPOSAL_NUM: 200
+        POS_IOU_THR: 0.5
+      TEST_CFG:
+        # x4_split: False
+        CLS_SCORE_THR: 0.001
+        MASK_SCORE_THR: -0.5
+        MIN_NPOINT: 100
+        EVAL_TASKS: [instance]
+
+    FIXED_MODULES: []
+    SEMANTIC_ONLY: False
+    OFFSET_LOSS: l1
 
 
 TEXT_ENCODER:
@@ -110,23 +147,30 @@ TEXT_ENCODER:
   BACKBONE: ViT-B/16  # ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14']
   TEMPLATE: identity
   EXTRACT_EMBED: False  # Online extract text embeding from class or not
+#  BERT:
+#  BACKBONE: bert-base-uncased
 
 OPTIMIZATION:
+  TEST_BATCH_SIZE_PER_GPU: 1
   BATCH_SIZE_PER_GPU: 4
-  NUM_EPOCHS: 128
+  NUM_EPOCHS: 160
   LR: 0.004  # 4e-3
-  SCHEDULER: adam_onecycle
-  OPTIMIZER: adam_onecycle
+  SCHEDULER: cos_after_step
+  OPTIMIZER: adamw
   WEIGHT_DECAY: 0.0001
   MOMENTUM: 0.9
-  STEP_EPOCH: 50
+  STEP_EPOCH: 82
   MULTIPLIER: 0.1
   CLIP_GRAD: False
-  PCT_START: 0.39
-  DIV_FACTOR: 1
+  PCT_START: 0.52
+  DIV_FACTOR: 2
   MOMS: [0.95, 0.85]
+  LR_CLIP: 0.000001
+  SAVE_EPOCH: [32]
 
 OTHERS:
   PRINT_FREQ: 20
   SYNC_BN: False
   USE_AMP: True
+  EVAL_FREQ: 10
+  FIND_UNUSED_PARAMETERS: True

@@ -1,54 +1,31 @@
 <div align="center">
 
-<h1>PLA: Language-Driven Open-Vocabulary 3D Scene Understanding</h1>
+<h1>RegionPLC: Regional Point-Language Contrastive Learning for Open-World 3D Scene Understanding</h1>
 
 <div>
-    <a href="https://dingry.github.io/" target="_blank">Runyu Ding</a><sup>1*</sup>,</span>
     <a href="https://jihanyang.github.io/" target="_blank">Jihan Yang</a><sup>1*</sup>,</span>
-    <a href="https://scholar.google.com/citations?user=KJU5YRYAAAAJ&hl=en" target="_blank">Chuhui Xue</a><sup>2</sup>,</span>
-    <a href="https://github.com/HannibalAPE" target="_blank">Wenqing Zhang</a><sup>2</sup>,</span>
-    <a href="https://songbai.site/" target="_blank">Song Bai</a><sup>2&#8224</sup>,</span>
-    <a href="https://xjqi.github.io/" target="_blank">Xiaojuan Qi</a><sup>1&#8224</sup>,</span>  
+    <a href="https://dingry.github.io/" target="_blank">Runyu Ding</a><sup>1*</sup>,</span>
+    <a href="https://github.com/VincentDENGP" target="_blank">Weipeng Deng</a><sup>2</sup>,</span>
+    <a href="https://wang-zhe.me/" target="_blank">Zhe Wang</a><sup>2</sup>,</span>
+    <a href="https://xjqi.github.io/" target="_blank">Xiaojuan Qi</a>,</span>  
 </div>
 
 <div>
     <sup>1</sup>The University of Hong Kong&emsp;
-    <sup>2</sup>ByteDance
+    <sup>2</sup>SenseTime Research
 </div>
 
 <div>
     *equal contribution&emsp;
-    <sup>+</sup>corresponding author
 </div>
 
-**CVPR 2023**
+**CVPR 2024**
+[project page](https://jihanyang.github.io/projects/RegionPLC) | [arXiv](https://arxiv.org/pdf/2304.00962)
 
-TL;DR: PLA leverages powerful VL foundation models to construct hierarchical 3D-text pairs for 3D open-world learning.
+![framwork](./docs/framework.png)
 
-<table>
-<tr>
-    <td><img src="assets/scene_0025.gif" width="100%"/></td>
-    <td><img src="assets/scene_005.gif" width="100%"/></td>
-    <td><img src="assets/scene_0019.gif" width="100%"/></td>
-</tr>
-<tr>
-    <td align='center' width='24%'>working space</td>
-    <td align='center' width='24%'>piano</td>
-    <td align='center' width='24%'>vending machine</td>
-<tr>
-</table>
-
-
-<!-- ![framwork](./docs/framework.png)
-![association](./docs/association_module.png)-->
-
-
-[project page](https://dingry.github.io/projects/PLA) | [arXiv](https://arxiv.org/abs/2211.16312)
 
 </div>
-
-### TODO
-- [ ] Release caption processing code
 
 ### Getting Started
 
@@ -66,11 +43,11 @@ Please refer to [MODEL.md](docs/MODEL.md) for training and inference scripts and
 ### Citation
 If you find this project useful in your research, please consider cite:
 ```bibtex
-@inproceedings{ding2022language,
-    title={PLA: Language-Driven Open-Vocabulary 3D Scene Understanding},
-    author={Ding, Runyu and Yang, Jihan and Xue, Chuhui and Zhang, Wenqing and Bai, Song and Qi, Xiaojuan},
+@inproceedings{yang2024regionplc,
+    title={RegionPLC: Regional point-language contrastive learning for open-world 3d scene understanding},
+    author={Yang, Jihan and Ding, Runyu and Deng, Weipeng and Wang, Zhe and Qi, Xiaojuan},
     booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
-    year={2023}
+    year={2024}
 }
 ```
 

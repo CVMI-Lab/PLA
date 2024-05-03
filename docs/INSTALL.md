@@ -9,6 +9,8 @@ All the codes are tested in the following environment:
 a. Clone this repository.
 ```bash
 git clone https://github.com/CVMI-Lab/PLA.git
+git fetch -all
+git checkout regionplc
 ```
 
 b. Install the dependent libraries as follows:

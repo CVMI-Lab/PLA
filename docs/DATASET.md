@@ -48,3 +48,26 @@ The dataset configs are located within [tools/cfgs/dataset_configs](../tools/cfg
     ```
 
 The scripts that process S3DIS images to generate captions and corresponding point indices will be available soon.
+
+
+#### nuScenes Dataset
+* Please download the official [NuScenes 3D object detection dataset](https://www.nuscenes.org/download) and organize the downloaded files as follows: 
+```
+PLA
+├── data
+│   ├── nuscenes
+│   │   │── v1.0-trainval (or v1.0-mini if you use mini)
+│   │   │   │── samples
+│   │   │   │── sweeps
+│   │   │   │── maps
+│   │   │   │── v1.0-trainval
+├── pcseg
+├── tools
+```
+
+* Install the `nuscenes-devkit` with version `1.0.5` by running the following command: 
+```shell script
+pip install nuscenes-devkit==1.0.5
+```
+
+- You can download our pre-processed caption and idx files here.

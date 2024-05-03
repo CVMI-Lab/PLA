@@ -9,9 +9,6 @@ from .dataset import DatasetTemplate
 from .scannet.scannet_dataset import ScanNetDataset, ScanNetInstDataset
 from .s3dis.s3dis_dataset import S3DISDataset, S3DISInstDataset
 from .nuscenes.nuscenes_dataset import NuScenesDataset, NuScenesPanopticDataset
-from .stpls3d.stpls3d_dataset import STPLS3DDataset, STPLS3DInstDataset
-from .kitti.kitti_dataset import KittiDataset, KittiPanopticDataset
-
 
 __all__ = {
     'DatasetTemplate': DatasetTemplate,
@@ -21,10 +18,6 @@ __all__ = {
     'S3DISInstDataset': S3DISInstDataset,
     'NuScenesDataset': NuScenesDataset,
     'NuScenesPanopticDataset': NuScenesPanopticDataset,
-    'KittiDataset': KittiDataset,
-    'KittiPanopticDataset': KittiPanopticDataset,
-    'STPLS3DDataset': STPLS3DDataset,
-    'STPLS3DInstDataset': STPLS3DInstDataset
 }
 
 

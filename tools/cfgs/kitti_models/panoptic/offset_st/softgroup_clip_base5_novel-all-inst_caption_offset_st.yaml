@@ -1,7 +1,0 @@
-_BASE_CONFIG_: cfgs/kitti_models/panoptic/offset_st/softgroup_clip_base4_caption_offset_st.yaml
-
-DATA_CONFIG:
-  stuff_class_idx: [0, 1, 2, 4, 5, 6, 7, 8, 9, 10]  # remove 3
-  base_class_idx: [0, 1, 2, 5, 6, 7, 8, 9, 10, 12, 14, 15, 18]
-  novel_class_idx: [4, 11, 13,16, 17]
-  ignore_class_idx: [3]

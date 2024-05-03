@@ -1,9 +1,0 @@
-_BASE_CONFIG_: cfgs/nuscenes_models/panoptic/softgroup_clip_base10_caption.yaml
-
-DATA_CONFIG:
-  stuff_class_idx: [12, 13, 14, 15]
-  base_class_idx: [ 1, 2, 4, 5, 6, 7, 10, 12, 13, 14, 15 ]
-  # car, trailer, truck
-  novel_class_idx: [ 3, 8, 9 ]
-  ignore_class_idx: [ 11 ] # ignore category will be mapped into novel for binary classifier
-

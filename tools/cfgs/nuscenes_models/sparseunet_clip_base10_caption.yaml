@@ -1,0 +1,155 @@
+CLASS_NAMES: ['barrier', 'bicycle', 'bus', 'car', 'construction_vehicle', 'motorcycle', 'pedestrian',
+'traffic_cone', 'trailer', 'truck', 'driveable_surface', 'other_flat', 'sidewalk', 'terrain', 'manmade',
+'vegetation']
+
+DATA_CONFIG:
+  _BASE_CONFIG_: cfgs/dataset_configs/nuscenes_dataset.yaml
+  XYZ_NORM: False
+  COLLATE_FN: collate_batch_lai
+  MIN_SPATIAL_SCALE: 128
+
+  base_class_idx: [ 1, 2, 3, 4, 8, 9, 10, 13, 14, 15 ]
+  # barrier, motorcycle, pedestrian, traffic_cone, sidewalk
+  novel_class_idx: [ 0, 5, 6, 7, 12 ]
+  ignore_class_idx: [ 11 ] # ignore category will be mapped into novel for binary classifier
+
+  CAPTION_INFO:
+
+    KEY: [SCENE, VIEW, ENTITY]
+
+    SCENE:
+      ENABLED: False
+      CAPTION_PATH: text_embed/caption_scene_nuscenes_v1.0-trainval_vit-gpt2-image-captioning_v1.0-trainval.json
+      GATHER_CAPTION: True
+      GATHER_CAP_MODE: emb
+
+    VIEW:
+      ENABLED: True
+      CAPTION_PATH: text_embed/caption_kosmos_and_sw_iou0.3-0.0.json
+      IMAGE_CORR_PATH: nuscenes_caption_idx_kosmos_and_sw_iou0.3-0.0.pkl
+      SELECT: ratio
+      NUM: 1
+      RATIO: 0.5
+      GATHER_CAPTION: True
+      GATHER_CAP_MODE: cap
+
+    ENTITY:
+      ENABLED: False
+      CAPTION_PATH:
+      SELECT: ratio
+      NUM: 1
+      RATIO: 1.0
+      GATHER_CAPTION: True
+      GATHER_CAP_MODE: emb
+
+  DATA_PROCESSOR:
+    PROCESS_LIST: [ custom_voxelization_one ]
+
+    custom_voxelization_one:
+      xyz_norm: False
+      voxel_label: True
+
+OSS:
+  DATA: False
+
+MODEL:
+  NAME: SparseUNetTextSeg
+  REMAP_FROM_NOADAPTER: False
+
+  BACKBONE_3D:
+    NAME: SparseUNetIndoor
+    IN_CHANNEL: 4
+    MID_CHANNEL: 32
+    BLOCK_RESIDUAL: True
+    BLOCK_REPS: 2
+    NUM_FILTERS: [32, 64, 128, 256, 256]
+    CUSTOM_SP1X1: False
+
+  ADAPTER:
+    NAME: VLAdapter
+    EVAL_ONLY: False
+    NUM_ADAPTER_LAYERS: 1
+    TEXT_DIM: -1
+    LAST_NORM: True
+    FEAT_NORM: False
+
+  BINARY_HEAD:
+    NAME: BinaryHead
+    DETACH: True
+    CHANNEL: 32
+    THRESH: 0.5
+    CUSTOM_SP1X1: False
+    NUM_FILTERS: [32, 64, 128, 256, 256]
+    VOXEL_LOSS: True
+
+    HOOK_FEATURE_LIST: [ 'unet.blocks.block1', 'unet.u.blocks.block1',
+                         'unet.u.u.blocks.block1', 'unet.u.u.u.blocks.block1',
+                         'unet.u.u.u.u.blocks.block1' ]
+
+  TASK_HEAD:
+    NAME: TextSegHead
+    CORRECT_SEG_PRED_BINARY: True
+    VOXEL_LOSS: True
+
+    TEXT_EMBED:
+      NAME: CLIP
+      NORM: True
+      PATH: text_embed/nuscenes_16_clip-ViT-B16_text_embed.pth
+
+  CAPTION_HEAD:
+    NAME: CaptionHead
+    POOLING_TYPE: avg
+    FEAT_NORM: True
+    LOGIT_SCALE:
+      value: 100.0
+      learnable: True
+    CUDA_ENABLED: True
+    POOL_OBJ: score
+    LOSS_FUNC: NLL_NoReduce
+    LOSS_WEIGHT:
+      SCENE: 0.1
+      VIEW: 0.5
+      ENTITY: 0.1
+
+    DIV_N_CAP: False
+    DIV_MODE: none # [none, square, log2]
+    NOVEL_GRAD_ONLY: True
+
+TEXT_ENCODER:
+  NAME: CLIP
+  BACKBONE: ViT-B/16  # ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14']
+  TEMPLATE: identity
+  EXTRACT_EMBED: True  # Online extract text embedding from class or not
+  CATEGORY_NAMES: [ 'barrier or fence', 'bicycle or bike or cycle', 'bus', 'car',
+                    'construction vehicle or bulldozer or excavator or concrete mixer or crane or dump truck’',
+                    'motorcycle or motorbike',
+                    'pedestrian or people or man or woman',
+                    'traffic cone', 'trailer', 'truck', 'road or street', 'other flat', 'sidewalk',
+                    'grass or rolling hills or soil or gravel',
+                    'building or wall or fence or pole or sign or traffic light',
+                    'bushes or plants or trees or potted plants' ]
+
+
+OPTIMIZATION:
+  BATCH_SIZE_PER_GPU: 4
+  NUM_EPOCHS: 50
+  LR: 0.01
+  SCHEDULER: poly
+  OPTIMIZER: adamw
+  WEIGHT_DECAY: 0.01
+  MOMENTUM: 0.9
+  STEP_EPOCH: 50
+  MULTIPLIER: 0.1
+  CLIP_GRAD: False
+  PCT_START: 0.4
+  DIV_FACTOR: 1
+  MOMS: [0.95, 0.85]
+  # for poly scheduler
+  POWER: 0.9
+
+OTHERS:
+  PRINT_FREQ: 50
+  EVAL_FREQ: 5
+  CKPT_SAVE_INTERVAL: 1
+  SYNC_BN: False
+  USE_AMP: True
