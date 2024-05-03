@@ -48,7 +48,11 @@ TL;DR: PLA leverages powerful VL foundation models to construct hierarchical 3D-
 </div>
 
 ### TODO
-- [ ] Release caption processing code
+- [x] Release training and inference code
+- [x] Release pretrained models
+- [x] Release documents and guidelines
+- [x] Release scannet caption processing code
+- [ ] Release s3dis caption processing code
 
 ### Getting Started
 
