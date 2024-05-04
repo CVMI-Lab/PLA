@@ -1,0 +1,136 @@
+CLASS_NAMES: [wall, floor, cabinet, bed, chair, sofa, table, door, window, bookshelf, picture, counter,
+              desk, curtain, refrigerator, showercurtain, toilet, sink, bathtub, otherfurniture]
+
+DATA_CONFIG:
+  _BASE_CONFIG_: cfgs/dataset_configs/scannet_dataset.yaml
+  ignore_class_idx: [ 0, 1, 19 ]
+
+  LOAD_KD_LABEL_TRAIN: True
+  KD_LABEL_DIR: ../data/scannetv2/scannet_multiview_lseg
+  KD_LABEL_NORM: True
+
+  CAPTION_INFO:
+
+    KEY: [SCENE, VIEW, ENTITY]
+  
+    SCENE:
+      ENABLED: False
+      CAPTION_PATH: text_embed/caption.json
+      GATHER_CAPTION: False
+
+    VIEW:
+      ENABLED: True
+      CAPTION_PATH: text_embed/caption_kosmos_and_sw_125k_iou0.2-0.0.json 
+      IMAGE_CORR_PATH: scannet_caption_idx_kosmos_and_sw_125k_iou0.2-0.0.pkl
+      SELECT: ratio
+      NUM: 1
+      RATIO: 0.2
+      SAMPLE: 1
+      GATHER_CAPTION: False
+
+    ENTITY:
+      ENABLED: False
+      CAPTION_PATH: text_embed/caption_detic_crop_matching_idx.json
+      IMAGE_CORR_PATH: scannetv2_detic_crop_matching_idx.pickle
+      SELECT: ratio
+      NUM: 1
+      RATIO: 0.5
+      GATHER_CAPTION: False
+    
+    CAPTION_CORR_PATH_IN_ONE_FILE: True
+
+  FILTER_WITH_N_CAPTIONS: -1
+
+MODEL:
+  NAME: SparseUNetTextSeg
+  REMAP_FROM_3DLANG: False
+  REMAP_FROM_NOADAPTER: False
+
+  VFE:
+    NAME: IndoorVFE
+    USE_XYZ: True
+
+  BACKBONE_3D:
+    NAME: SparseUNetIndoor
+    IN_CHANNEL: 6
+    MID_CHANNEL: 32
+    BLOCK_RESIDUAL: True
+    BLOCK_REPS: 2
+    NUM_BLOCKS: 7
+    CUSTOM_SP1X1: True
+
+  ADAPTER:
+    NAME: VLAdapter
+    EVAL_ONLY: False
+    NUM_ADAPTER_LAYERS: 2
+    TEXT_DIM: -1
+    LAST_NORM: False
+    FEAT_NORM: False
+
+  TASK_HEAD:
+    NAME: TextSegHead
+    EVAL_ONLY: True 
+    FEAT_NORM: False
+    IN_FEAT_NAME: adapter_feats
+    IN_CHANNEL: 512
+
+    TEXT_EMBED:
+      NAME: CLIP
+      NORM: True
+      PATH: text_embed/scannet_clip-ViT-B32_lseg.pth
+
+    LOGIT_SCALE:
+      value: 1.0
+      learnable: False
+    LOSS_WEIGHT: 0.0
+  
+  CAPTION_HEAD:
+    NAME: CaptionHead
+    IN_FEAT_NAME: adapter_feats
+    POOLING_TYPE: avg
+    FEAT_NORM: True
+    LOGIT_SCALE:
+      value: 100.0
+      learnable: True
+    CUDA_ENABLED: True
+    POOL_OBJ: score
+    LOSS_FUNC: NLL_NoReduce
+    LOSS_WEIGHT:
+      SCENE: 0.1
+      VIEW: 1.0
+      ENTITY: 0.1
+  
+  KD_HEAD:
+    NAME: KDHeadTemplate
+    IN_FEAT_NAME: adapter_feats
+    FEAT_NORM: True
+
+    LOSS_CONFIG:
+      LOSS_WEIGHT: 1.0
+
+TEXT_ENCODER:
+  NAME: CLIP
+  BACKBONE: ViT-B/32  # ['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14']
+  TEMPLATE: lseg
+  EXTRACT_EMBED: False 
+
+
+OPTIMIZATION:
+  BATCH_SIZE_PER_GPU: 4
+  NUM_EPOCHS: 128
+  LR: 0.004  # 4e-3
+  SCHEDULER: adam_onecycle
+  OPTIMIZER: adam_onecycle
+  WEIGHT_DECAY: 0.0001
+  MOMENTUM: 0.9
+  STEP_EPOCH: 50
+  MULTIPLIER: 0.1
+  CLIP_GRAD: False
+  PCT_START: 0.4
+  DIV_FACTOR: 2
+  MOMS: [0.95, 0.85]
+
+OTHERS:
+  PRINT_FREQ: 20
+  SYNC_BN: False
+  USE_AMP: True

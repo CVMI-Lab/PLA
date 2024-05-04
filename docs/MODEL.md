@@ -9,12 +9,12 @@ For instance,
 - train B15/N4 semantic segmentation on ScanNet:
     ```bash
     cd tools
-    sh scripts/dist_train.sh 8 --cfg_file cfgs/scannet_models/spconv_clip_base15_caption_adamw.yaml --extra_tag exp_tag
+    sh scripts/dist_train.sh 8 --cfg_file cfgs/scannet_models/spconv_clip_base15_caption.yaml --extra_tag exp_tag
     ```
 - train B13/N4 instance segmentation on ScanNet:
     ```bash
     cd tools
-    sh scripts/dist_train.sh 8 --cfg_file cfgs/scannet_models/inst/softgroup_clip_base13_caption_adamw.yaml --extra_tag exp_tag
+    sh scripts/dist_train.sh 8 --cfg_file cfgs/scannet_models/inst/softgroup_clip_base13_caption.yaml --extra_tag exp_tag
     ```
 
 #### Inference
@@ -28,7 +28,7 @@ For instance,
 - to test a B15/N4 model on ScanNet:
     ```bash
     cd tools
-    sh scripts/dist_test.sh 8 --cfg_file cfgs/scannet_models/spconv_clip_base15_caption_adamw.yaml --ckpt output/scannet_models/spconv_clip_base15_caption/exp_tag/ckpt/checkpoint_ep128.pth
+    sh scripts/dist_test.sh 8 --cfg_file cfgs/scannet_models/spconv_clip_base15_caption.yaml --ckpt output/scannet_models/spconv_clip_base15_caption/exp_tag/ckpt/checkpoint_ep128.pth
     ```
 
 ### Model Zoo
@@ -49,12 +49,12 @@ For instance,
   
     | Dataset | Model | mIoU  (mAcc) | Path |
     |:---:|:---:|:---:|:---:|
-    | ScanNet | [RegionPLC + SparseUNet16]() | 56.9 (75.6) | [ckpt]() |
-    | ScanNet | [RegionPLC + SparseUNet32]() | 59.6 (77.5) | [ckpt]() |
-    | ScanNet | [RegionPLC + OpenScene + SparseUNet16]() | 60.1 (74.4) | [ckpt]() |
-    | ScanNet | [RegionPLC + OpenScene + SparseUNet32]() | 63.6 (80.3)  | [ckpt]() |
-    | ScanNet200 | [RegionPLC + SparseUNet32]() |  9.1 (17.3) | [ckpt]() |
-    | ScanNet200 | [RegionPLC + OpenScene + SparseUNet32]() |  9.6 (17.8) | [ckpt]() |
+    | ScanNet | [RegionPLC + SparseUNet16](../tools/cfgs/scannet_models/zs/spconv_clip_caption_sparseunet16.yaml) | 56.9 (75.6) | [ckpt]() |
+    | ScanNet | [RegionPLC + SparseUNet32](../tools/cfgs/scannet_models/zs/spconv_clip_caption_sparseunet32.yaml) | 59.6 (77.5) | [ckpt]() |
+    | ScanNet | [RegionPLC + OpenScene + SparseUNet16](../tools/cfgs/scannet_models/zs/spconv_clip_caption_sparseunet16_openscene.yaml) | 60.1 (74.4) | [ckpt]() |
+    | ScanNet | [RegionPLC + OpenScene + SparseUNet32](../tools/cfgs/scannet_models/zs/spconv_clip_caption_sparseunet32_openscene.yaml) | 63.6 (80.3)  | [ckpt]() |
+    | ScanNet200 | [RegionPLC + SparseUNet32]() |  9.1 (17.3) | [ckpt](../tools/cfgs/scannet200_models/zs/spconv_clip_caption.yaml) |
+    | ScanNet200 | [RegionPLC + OpenScene + SparseUNet32](../tools/cfgs/scannet200_models/zs/spconv_clip_caption_openscene.yaml) |  9.6 (17.8) | [ckpt]() |
 
 
 #### 3D Instance Segmentation
