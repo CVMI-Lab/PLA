@@ -1,5 +1,6 @@
 import glob
 import os
+import sys
 import datetime
 import torch
 import time
@@ -10,8 +11,9 @@ from pcseg.utils import common_utils, commu_utils, caption_utils
 from pcseg.utils import pseudo_label_utils
 from pcseg.config import cfg
 from pcseg.models import load_data_to_gpu
-from tools.eval_utils import eval_utils
 from .optimization import adjust_lr
+
+from tools.eval_utils import eval_utils
 
 
 def train_one_epoch(args, model, optimizer, train_loader, lr_scheduler, accumulated_iter, rank,

@@ -32,7 +32,8 @@ class ScanNetDataset(IndoorDataset):
         else:
             self.data_list = [str(self.root_path / self.split_file.split('_')[0] / f'{d.strip()}{self.data_suffix}') for d in data_list]
         self.need_super_voxel = self.dataset_cfg.get('NEED_SV', False)
-        self.put_data_to_shm()
+        if self.cache:
+            self.put_data_to_shm()
 
         if hasattr(self, 'caption_cfg') and self.caption_cfg.get('CAPTION_CORR_PATH_IN_ONE_FILE', True):
             self.scene_image_corr_infos, self.scene_image_corr_entity_infos = self.include_point_caption_idx()
