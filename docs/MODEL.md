@@ -32,6 +32,7 @@ For instance,
     ```
 
 ### Model Zoo
+You can also download all pretrained models and caption files from [Hugging Face](https://huggingface.co/jihanyang/RegionPLC)
 #### 3D Semantic Segmentation
 - Base-annotated setup
 
