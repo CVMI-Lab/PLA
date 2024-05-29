@@ -29,7 +29,7 @@ The dataset configs are located within [tools/cfgs/dataset_configs](../tools/cfg
     python3 pcseg/datasets/s3dis/preprocess.py 
     ```
     
-- Additionally, please download the caption data [here](https://connecthkuhk-my.sharepoint.com/:f:/g/personal/u3007346_connect_hku_hk/EoNAsU5f8YRGtQYV8ewhwvQB7QPbxT-uwKqTk8FPiyUTtQ?e=wq58H7). Download image data [here](https://github.com/alexsax/2D-3D-Semantics) if you want to generate captions on your own.
+- Additionally, please download the caption data [here](https://connecthkuhk-my.sharepoint.com/:f:/g/personal/u3007346_connect_hku_hk/EoNAsU5f8YRGtQYV8ewhwvQB7QPbxT-uwKqTk8FPiyUTtQ?e=wq58H7). If you want to generate captions on your own, please download image data [here](https://github.com/alexsax/2D-3D-Semantics) and follows scripts here: [generate_caption.py](../tools/process_tools/generate_caption.py) and [generate_caption_idx.py](../tools/process_tools/generate_caption_idx.py).
  
 - The directory organization should be as follows:
 
@@ -46,5 +46,3 @@ The dataset configs are located within [tools/cfgs/dataset_configs](../tools/cfg
     ├── pcseg
     ├── tools
     ```
-
-The scripts that process S3DIS images to generate captions and corresponding point indices will be available soon.
