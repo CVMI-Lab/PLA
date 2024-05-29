@@ -4,6 +4,8 @@ import numpy as np
 import pickle
 import json
 import torch
+import glob
+import cv2
 
 from ..indoor_dataset import IndoorDataset
 from ...utils.common_utils import sa_create, sa_delete
@@ -200,6 +202,121 @@ class S3DISDataset(IndoorDataset):
         # data_dict.pop('points_xyz')
         data_dict.pop('rgb')
         return data_dict
+
+    def get_image(self, info, data_dict):
+        data_dict['point_img_1d'] = {}
+        data_dict['point_img'] = {}
+        data_dict['point_img_idx'] = {}
+        data_dict['image_shape'] = {}
+        scene_name = data_dict['scene_name']
+        depth_image_size = info['depth_image_size']
+
+        _, area_num, room_name, room_num = scene_name.split('_')
+        pose_paths = sorted(
+            glob.glob(str(self.root_path / self.image_path / f'area_{area_num}' /
+                          'data/pose/*_{}_{}_*.json'.format(room_name, room_num))),
+            key=lambda a: os.path.basename(a).split('.')
+        )
+        depth_paths = sorted(
+            glob.glob(str(self.root_path / self.image_path / f'area_{area_num}' /
+                          'data/depth/*_{}_{}_*.png'.format(room_name, room_num))),
+            key=lambda a: os.path.basename(a).split('.')
+        )
+        color_paths = sorted(
+            glob.glob(str(self.root_path / self.image_path / f'area_{area_num}' /
+                          'data/rgb/*_{}_{}_*.png'.format(room_name, room_num))),
+            key=lambda a: os.path.basename(a).split('.')
+        )
+        try:
+            assert len(pose_paths) == len(depth_paths) and len(pose_paths) == len(color_paths)
+        except:  # ignore this sample
+            pose_paths = depth_paths = color_paths = []
+
+        points_xyz = data_dict['points_xyz'] + np.array(self.pc_mins[scene_name]).reshape(-1, 3)
+
+        for ind, (pose, depth, color) in enumerate(zip(pose_paths, depth_paths, color_paths)):
+            image_name = pose.split('/')[-1].split('.')[0][:-len('_domain_pose')]
+            # print(image_name)
+            point_idx, image_idx_1d, image_idx, color_image_shape = \
+                self.project_point_to_image(points_xyz, pose, depth, color, depth_image_size)
+            data_dict['point_img_1d'][image_name.lower()] = image_idx_1d
+            data_dict['point_img'][image_name.lower()] = image_idx
+            data_dict['point_img_idx'][image_name.lower()] = point_idx
+            data_dict['image_shape'][image_name.lower()] = color_image_shape
+
+        data_dict['depth_image_size'] = depth_image_size
+        return data_dict
+
+    @staticmethod
+    def project_point_to_image(points_world, pose_path, depth_path, color_path, image_size):
+
+        with open(pose_path, 'r') as fin:
+            data = json.load(fin)
+        depth_intrinsic = np.array(data['camera_k_matrix'])
+
+        fx = depth_intrinsic[0, 0]
+        fy = depth_intrinsic[1, 1]
+        cx = depth_intrinsic[0, 2]
+        cy = depth_intrinsic[1, 2]
+        bx = 0
+        by = 0
+
+        # == processing depth ===
+        depth_img = cv2.imread(depth_path, -1)  # read 16bit grayscale image
+        depth_shift = 512.0
+        depth = depth_img / depth_shift
+        depth_mask = (depth_img != 0)
+
+        # == processing color ===
+        color_image = cv2.imread(color_path)
+        color_image_shape = color_image.shape
+        color_image = cv2.resize(color_image, (image_size[1], image_size[0]))
+        # color_image = np.reshape(color_image[mask], [-1,3])  ##########
+        color_image = np.reshape(color_image, [-1, 3])
+        colors = np.zeros_like(color_image)
+        colors[:, 0] = color_image[:, 2]
+        colors[:, 1] = color_image[:, 1]
+        colors[:, 2] = color_image[:, 0]
+
+        # == processing pose ===
+        pose = data['camera_rt_matrix']
+        pose.append([0, 0, 0, 1])
+        pose = np.array(pose)
+        # pose = np.linalg.inv(pose)[:3]
+
+        # == 3D to camera coordination ===
+        points = np.hstack((points_world[..., :3], np.ones((points_world.shape[0], 1))))
+        # points = np.dot(points, np.linalg.inv(np.transpose(pose)))
+        points = np.dot(points, np.transpose(pose))
+
+        # == camera to image coordination ===
+        u = (points[..., 0] - bx) * fx / points[..., 2] + cx
+        v = (points[..., 1] - by) * fy / points[..., 2] + cy
+        d = points[..., 2]
+        u = (u + 0.5).astype(np.int32)
+        v = (v + 0.5).astype(np.int32)
+
+        point_valid_mask = (d >= 0) & (u < image_size[1]) & (v < image_size[0]) & (u >= 0) & (v >= 0)
+        point_valid_idx = np.where(point_valid_mask)[0]
+        point2image_coords = v * image_size[1] + u
+        valid_point2image_coords = point2image_coords[point_valid_idx]
+
+        depth = depth.reshape(-1)
+        depth_mask = depth_mask.reshape(-1)
+        # u_, v_ = np.meshgrid(np.linspace(0, image_size[1] - 1, image_size[1]), np.linspace(0, image_size[0] - 1, image_size[0]))
+        # image_coords = (v_ * image_size[1] + u_).reshape(-1)
+        image_depth = depth[valid_point2image_coords.astype(np.int64)]
+        depth_mask = depth_mask[valid_point2image_coords.astype(np.int64)]
+        point2image_depth = d[point_valid_idx]
+        depth_valid_mask = depth_mask & (np.abs(image_depth - point2image_depth) <= 0.2 * image_depth)
+        # depth_valid_idx = np.where(depth_valid_mask)[0]  # corresponding image coords
+        point2image_coords_1d = valid_point2image_coords[depth_valid_mask]  # corresponding image coords
+        point2image_coords_u = point2image_coords_1d % image_size[1]  # (width, long)
+        point2image_coords_v = point2image_coords_1d // image_size[1]  # (height, short)
+        point2image_coords_2d = np.concatenate([point2image_coords_u[:, None], point2image_coords_v[:, None]], axis=-1)
+        point_valid_idx = point_valid_idx[depth_valid_mask]  # corresponding point idx
+
+        return point_valid_idx, point2image_coords_1d, point2image_coords_2d, color_image_shape
 
     def _del__(self):
         if not self.cache:
