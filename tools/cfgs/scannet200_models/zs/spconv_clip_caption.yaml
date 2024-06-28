@@ -21,7 +21,7 @@ CLASS_NAMES: ['wall', 'chair', 'floor', 'table', 'door', 'couch', 'cabinet', 'sh
 
 DATA_CONFIG:
   _BASE_CONFIG_: cfgs/dataset_configs/scannet200_dataset.yaml
-  ignore_class_idx: []
+  ignore_class_idx: [0, 2, 35, 98, 136, 147, 153, 159, 166, 167, 183, 186, 191, 198]
   trainonly_class_idx: [98, 136, 147, 153, 159, 166, 167, 183, 186, 191, 198]
 
   CAPTION_INFO:
@@ -90,7 +90,7 @@ MODEL:
     TEXT_EMBED:
       NAME: CLIP
       NORM: True
-      PATH: text_embed/scannet_clip-ViT-B16_id.pth
+      PATH: text_embed/scannet200_clip-ViT-B16_id.pth
 
     LOGIT_SCALE:
       value: 1.0
